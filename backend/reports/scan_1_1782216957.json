@@ -1,0 +1,19 @@
+{
+  "scan_id": 1,
+  "website": "https://codingbyali.sitte",
+  "generated_at": "2026-06-23T12:15:57.436660+00:00",
+  "security_score": 100.0,
+  "grade": "A",
+  "risk_level": "low",
+  "executive_summary": "Audit keamanan untuk https://codingbyali.sitte telah selesai dilakukan oleh Sentinel AI. Website mendapatkan Security Score 100.0/100 dengan Grade A. Ditemukan 0 temuan Critical, 0 High, 0 Medium, dan 0 Low. Total 0 rekomendasi perbaikan telah disiapkan.",
+  "findings": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "total": 0
+  },
+  "technologies": [],
+  "predictions": [],
+  "recommendations": []
+}

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login – Sentinel AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { fontFamily: { sans: ["Inter", "sans-serif"] } } } }</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="../../assets/js/api.js"></script>
+</head>
+<body class="bg-slate-50 font-sans min-h-screen flex">
+
+  <!-- Left Panel -->
+  <div class="hidden lg:flex flex-col justify-between w-1/2 bg-slate-900 p-12 relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10" style="background: radial-gradient(circle at 20% 50%, #3b82f6 0%, transparent 50%), radial-gradient(circle at 80% 20%, #8b5cf6 0%, transparent 50%)"></div>
+    <div class="relative z-10">
+      <div class="flex items-center gap-3 mb-16">
+        <div class="w-9 h-9 bg-white/10 border border-white/20 rounded-xl flex items-center justify-center">
+          <i data-lucide="shield-check" class="w-5 h-5 text-white"></i>
+        </div>
+        <span class="text-white font-bold text-lg">Sentinel AI</span>
+      </div>
+      <h1 class="text-4xl font-bold text-white leading-tight mb-4">
+        Audit Keamanan Website<br />dengan Kecerdasan Buatan
+      </h1>
+      <p class="text-slate-400 text-base leading-relaxed">
+        Platform audit keamanan berbasis Multi-Agent AI yang mampu melakukan crawling, fingerprinting, 
+        active testing, dan menghasilkan laporan profesional secara otomatis.
+      </p>
+    </div>
+    <div class="relative z-10 grid grid-cols-3 gap-4">
+      <div class="bg-white/5 border border-white/10 rounded-xl p-4">
+        <p class="text-2xl font-bold text-white">OWASP</p>
+        <p class="text-xs text-slate-400 mt-1">Top 10 Coverage</p>
+      </div>
+      <div class="bg-white/5 border border-white/10 rounded-xl p-4">
+        <p class="text-2xl font-bold text-white">ML</p>
+        <p class="text-xs text-slate-400 mt-1">AI Verification</p>
+      </div>
+      <div class="bg-white/5 border border-white/10 rounded-xl p-4">
+        <p class="text-2xl font-bold text-white">PDF</p>
+        <p class="text-xs text-slate-400 mt-1">Auto Report</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel -->
+  <div class="flex-1 flex items-center justify-center p-6">
+    <div class="w-full max-w-sm">
+      <!-- Logo mobile -->
+      <div class="lg:hidden flex items-center gap-2 mb-8">
+        <div class="w-8 h-8 bg-slate-900 rounded-xl flex items-center justify-center">
+          <i data-lucide="shield-check" class="w-4 h-4 text-white"></i>
+        </div>
+        <span class="font-bold text-slate-900">Sentinel AI</span>
+      </div>
+
+      <h2 class="text-2xl font-bold text-slate-900 mb-1">Masuk</h2>
+      <p class="text-sm text-slate-500 mb-8">Masukkan kredensial Anda untuk melanjutkan</p>
+
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+          <input type="email" id="email" placeholder="admin@sentinel.ai" required
+            class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+          <div class="relative">
+            <input type="password" id="password" placeholder="••••••••" required
+              class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition pr-10" />
+            <button type="button" onclick="togglePass()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <i data-lucide="eye" class="w-4 h-4" id="pass-icon"></i>
+            </button>
+          </div>
+        </div>
+        <button type="submit" id="login-btn"
+          class="w-full bg-slate-900 text-white py-2.5 px-4 rounded-xl text-sm font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50">
+          <span id="btn-text">Masuk</span>
+          <span id="btn-loader" class="hidden">
+            <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"/></svg>
+          </span>
+        </button>
+      </form>
+
+      <p class="text-center text-sm text-slate-500 mt-6">
+        Belum punya akun?
+        <a href="register.html" class="font-semibold text-slate-900 hover:underline">Daftar</a>
+      </p>
+    </div>
+  </div>
+
+<script>
+  // Redirect if already logged in
+  if (Auth.isLoggedIn()) window.location.href = "../../pages/dashboard/index.html";
+  lucide.createIcons();
+
+  function togglePass() {
+    const input = document.getElementById("password");
+    const icon  = document.getElementById("pass-icon");
+    if (input.type === "password") {
+      input.type = "text";
+      icon.setAttribute("data-lucide", "eye-off");
+    } else {
+      input.type = "password";
+      icon.setAttribute("data-lucide", "eye");
+    }
+    lucide.createIcons();
+  }
+
+  document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("login-btn");
+    const btnText = document.getElementById("btn-text");
+    const loader = document.getElementById("btn-loader");
+    btn.disabled = true;
+    btnText.textContent = "Memproses...";
+    loader.classList.remove("hidden");
+
+    const res = await API.auth.login({
+      email:    document.getElementById("email").value,
+      password: document.getElementById("password").value,
+    });
+
+    btn.disabled = false;
+    btnText.textContent = "Masuk";
+    loader.classList.add("hidden");
+
+    if (res.ok && res.data.data?.token) {
+      Auth.setToken(res.data.data.token);
+      Auth.setUser(res.data.data.user);
+      window.location.href = "../../pages/dashboard/index.html";
+    } else {
+      toast(res.data.message || "Email atau password salah", "error");
+    }
+  });
+</script>
+</body>
+</html>

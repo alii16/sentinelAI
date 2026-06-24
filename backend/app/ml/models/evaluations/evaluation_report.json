@@ -1,0 +1,42 @@
+{
+  "trained_at": "2026-06-23 20uman:00:54",
+  "best_model": "SVM",
+  "models": {
+    "Random Forest": {
+      "accuracy": 0.6516666666666666,
+      "precision": 0.6190040805124875,
+      "recall": 0.6516666666666666,
+      "f1": 0.6258532262031131,
+      "roc_auc": 0.8969102831576927,
+      "training_time": 0.379,
+      "file_path": "C:\\Users\\boy93\\OneDrive\\Documents\\React\\sentinel_ai\\backend\\app\\ml\\training\\../models/saved\\random_forest.joblib"
+    },
+    "XGBoost": {
+      "accuracy": 0.6533333333333333,
+      "precision": 0.6357602034055624,
+      "recall": 0.6533333333333333,
+      "f1": 0.6393872979525632,
+      "roc_auc": 0.8912949686862508,
+      "training_time": 1.037,
+      "file_path": "C:\\Users\\boy93\\OneDrive\\Documents\\React\\sentinel_ai\\backend\\app\\ml\\training\\../models/saved\\xgboost.joblib"
+    },
+    "Decision Tree": {
+      "accuracy": 0.6183333333333333,
+      "precision": 0.6048019464740054,
+      "recall": 0.6183333333333333,
+      "f1": 0.6078915421003088,
+      "roc_auc": 0.8173007167959471,
+      "training_time": 0.017,
+      "file_path": "C:\\Users\\boy93\\OneDrive\\Documents\\React\\sentinel_ai\\backend\\app\\ml\\training\\../models/saved\\decision_tree.joblib"
+    },
+    "SVM": {
+      "accuracy": 0.665,
+      "precision": 0.6482033268296673,
+      "recall": 0.665,
+      "f1": 0.6551718190944151,
+      "roc_auc": 0.888799383942818,
+      "training_time": 1.008,
+      "file_path": "C:\\Users\\boy93\\OneDrive\\Documents\\React\\sentinel_ai\\backend\\app\\ml\\training\\../models/saved\\svm.joblib"
+    }
+  }
+}

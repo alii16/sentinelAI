@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Notifikasi – Sentinel AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={theme:{extend:{fontFamily:{sans:["Inter","sans-serif"]}}}}</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/layout.js"></script>
+</head>
+<body class="bg-slate-50 font-sans">
+<div id="app-layout"></div>
+<script>
+authGuard();
+renderLayout("notifications");
+document.getElementById("breadcrumb-title").textContent = "Notifikasi";
+
+async function loadNotifications() {
+  const c = document.getElementById("notif-container");
+  c.innerHTML = `<div class="p-6">${skeleton(4)}</div>`;
+  const res = await API.notifications.list();
+  const notifs = res.data?.data || [];
+  if (!notifs.length) {
+    c.innerHTML = `<div class="py-16 text-center"><i data-lucide="bell-off" class="w-10 h-10 text-slate-300 mx-auto mb-3"></i><p class="text-sm text-slate-500">Tidak ada notifikasi</p></div>`;
+    lucide.createIcons(); return;
+  }
+  c.innerHTML = `<div class="divide-y divide-slate-50">
+    ${notifs.map(n => `
+      <div class="flex items-start gap-4 px-5 py-4 hover:bg-slate-50 transition ${n.is_read ? 'opacity-70' : ''}">
+        <div class="w-9 h-9 rounded-xl ${n.type==='scan_completed' ? 'bg-emerald-100' : 'bg-blue-100'} flex items-center justify-center shrink-0 mt-0.5">
+          <i data-lucide="${n.type==='scan_completed' ? 'check-circle-2' : 'bell'}" class="w-4 h-4 ${n.type==='scan_completed' ? 'text-emerald-600' : 'text-blue-600'}"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-slate-900">${n.title}</p>
+          ${n.body ? `<p class="text-sm text-slate-500 mt-0.5">${n.body}</p>` : ""}
+          <p class="text-xs text-slate-400 mt-1">${formatDate(n.created_at)}</p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          ${!n.is_read ? `<div class="w-2 h-2 bg-blue-500 rounded-full"></div>` : ""}
+          <button onclick="deleteNotif(${n.id}, this)" class="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-red-500 transition">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>`).join("")}
+  </div>`;
+  lucide.createIcons();
+}
+
+async function markAll() {
+  await API.notifications.markAll();
+  toast("Semua notifikasi ditandai dibaca");
+  loadNotifications();
+}
+
+async function deleteNotif(id, btn) {
+  await API.notifications.delete(id);
+  btn.closest("div.flex").remove();
+}
+
+document.getElementById("page-content").innerHTML = `
+  <div class="space-y-5">
+    <div class="flex items-center justify-between">
+      <div><h1 class="text-xl font-bold text-slate-900">Notifikasi</h1><p class="text-sm text-slate-500">Semua aktivitas dan pembaruan sistem</p></div>
+      <button onclick="markAll()" class="flex items-center gap-2 border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-50 transition">
+        <i data-lucide="check-check" class="w-4 h-4"></i> Tandai semua dibaca
+      </button>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div id="notif-container"></div>
+    </div>
+  </div>`;
+lucide.createIcons();
+loadNotifications();
+</script>
+</body>
+</html>

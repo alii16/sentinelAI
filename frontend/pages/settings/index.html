@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Pengaturan – Sentinel AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={theme:{extend:{fontFamily:{sans:["Inter","sans-serif"]}}}}</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/layout.js"></script>
+</head>
+<body class="bg-slate-50 font-sans">
+<div id="app-layout"></div>
+<script>
+authGuard();
+renderLayout("settings");
+document.getElementById("breadcrumb-title").textContent = "Pengaturan";
+
+let activeTab = "profile";
+const user = Auth.getUser();
+
+function renderSettings() {
+  document.getElementById("page-content").innerHTML = `
+    <div class="max-w-2xl mx-auto space-y-5">
+      <h1 class="text-xl font-bold text-slate-900">Pengaturan</h1>
+
+      <!-- Tabs -->
+      <div class="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        ${["profile","security"].map(t => `
+          <button onclick="setTab('${t}')" id="tab-${t}"
+            class="px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab===t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}">
+            ${t === "profile" ? "Profil" : "Keamanan"}
+          </button>`).join("")}
+      </div>
+
+      <!-- Tab Content -->
+      <div id="tab-content"></div>
+    </div>`;
+  lucide.createIcons();
+  renderTab();
+}
+
+function setTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll("[id^='tab-']").forEach(b => {
+    const isActive = b.id === `tab-${tab}`;
+    b.className = `px-4 py-1.5 rounded-lg text-sm font-medium transition ${isActive ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`;
+  });
+  renderTab();
+}
+
+function renderTab() {
+  const c = document.getElementById("tab-content");
+  if (activeTab === "profile") {
+    c.innerHTML = `
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-5">
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center text-white text-2xl font-bold">
+            ${user?.name?.charAt(0)?.toUpperCase() || "?"}
+          </div>
+          <div>
+            <p class="font-semibold text-slate-900">${user?.name || "–"}</p>
+            <p class="text-sm text-slate-500">${user?.email || "–"}</p>
+            <span class="mt-1 inline-block px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full capitalize">${user?.role || "user"}</span>
+          </div>
+        </div>
+        <hr class="border-slate-100"/>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1.5">Nama Lengkap</label>
+            <input id="prof-name" type="text" value="${user?.name || ""}"
+              class="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"/>
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button onclick="saveProfile()" class="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 transition">
+            <i data-lucide="save" class="w-4 h-4"></i> Simpan
+          </button>
+        </div>
+      </div>`;
+  } else {
+    c.innerHTML = `
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-5">
+        <h3 class="text-sm font-semibold text-slate-900">Ubah Password</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1.5">Password Lama</label>
+            <input id="old-pass" type="password" class="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"/>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1.5">Password Baru</label>
+            <input id="new-pass" type="password" class="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"/>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1.5">Konfirmasi Password Baru</label>
+            <input id="conf-pass" type="password" class="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"/>
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button onclick="changePassword()" class="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 transition">
+            <i data-lucide="lock" class="w-4 h-4"></i> Ubah Password
+          </button>
+        </div>
+      </div>`;
+  }
+  lucide.createIcons();
+}
+
+async function saveProfile() {
+  const name = document.getElementById("prof-name").value.trim();
+  if (!name) { toast("Nama tidak boleh kosong", "warning"); return; }
+  const res = await API.auth.updateProfile({ name });
+  if (res.ok) {
+    const u = Auth.getUser(); u.name = name; Auth.setUser(u);
+    toast("Profil diperbarui");
+  } else toast(res.data.message || "Gagal memperbarui", "error");
+}
+
+async function changePassword() {
+  const oldP = document.getElementById("old-pass").value;
+  const newP = document.getElementById("new-pass").value;
+  const conP = document.getElementById("conf-pass").value;
+  if (!oldP || !newP || !conP) { toast("Semua field wajib diisi", "warning"); return; }
+  if (newP !== conP) { toast("Password baru tidak cocok", "warning"); return; }
+  if (newP.length < 6) { toast("Password minimal 6 karakter", "warning"); return; }
+  const res = await API.auth.changePassword({ current_password: oldP, new_password: newP });
+  if (res.ok) toast("Password berhasil diubah");
+  else toast(res.data.message || "Gagal mengubah password", "error");
+}
+
+renderSettings();
+</script>
+</body>
+</html>

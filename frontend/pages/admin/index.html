@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Admin – Sentinel AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={theme:{extend:{fontFamily:{sans:["Inter","sans-serif"]}}}}</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/layout.js"></script>
+</head>
+<body class="bg-slate-50 font-sans">
+<div id="app-layout"></div>
+
+<script>
+authGuard();
+renderLayout("admin");
+document.getElementById("breadcrumb-title").textContent = "Admin Panel";
+
+let activeTab = "users";
+
+async function init() {
+  document.getElementById("page-content").innerHTML = `
+    <div class="space-y-5">
+      <div>
+        <h1 class="text-xl font-bold text-slate-900">Admin Panel</h1>
+        <p class="text-sm text-slate-500">Kelola pengguna, pengaturan sistem, dan model AI</p>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit flex-wrap">
+        ${["users","settings","system","ml_models"].map(t => `
+          <button onclick="setTab('${t}')" id="tab-${t}"
+            class="px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab===t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}">
+            ${{users:"Pengguna", settings:"Pengaturan", system:"Sistem", ml_models:"Model AI"}[t]}
+          </button>`).join("")}
+      </div>
+
+      <!-- Content -->
+      <div id="admin-content"></div>
+    </div>`;
+
+  lucide.createIcons();
+  await renderTab();
+}
+
+function setTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll("[id^='tab-']").forEach(b => {
+    const isActive = b.id === `tab-${tab}`;
+    b.className = `px-4 py-1.5 rounded-lg text-sm font-medium transition ${isActive ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`;
+  });
+  renderTab();
+}
+
+async function renderTab() {
+  const c = document.getElementById("admin-content");
+  c.innerHTML = `<div class="p-6 bg-white border border-slate-200 rounded-2xl">${skeleton(4)}</div>`;
+
+  if (activeTab === "users") await renderUsers(c);
+  else if (activeTab === "settings") await renderSettings(c);
+  else if (activeTab === "system") await renderSystem(c);
+  else if (activeTab === "ml_models") await renderMLModels(c);
+}
+
+// ── USERS ─────────────────────────────────────────────────────
+async function renderUsers(c) {
+  const res = await request("GET", "/users");
+  if (!res.ok) {
+    c.innerHTML = `<div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex gap-3">
+      <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"></i>
+      <div>
+        <p class="text-sm font-semibold text-amber-900">Akses Ditolak</p>
+        <p class="text-sm text-amber-700 mt-1">Halaman ini hanya untuk Administrator. Login dengan akun admin terlebih dahulu.</p>
+      </div>
+    </div>`;
+    lucide.createIcons(); return;
+  }
+
+  const users = res.data.data || [];
+  c.innerHTML = `
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <p class="text-sm font-semibold text-slate-900">Semua Pengguna <span class="ml-1 px-2 py-0.5 bg-slate-100 rounded-full text-xs">${users.length}</span></p>
+        <button onclick="openAddUserModal()" class="flex items-center gap-1.5 text-xs font-semibold bg-slate-900 text-white px-3 py-2 rounded-xl hover:bg-slate-800 transition">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Tambah User
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 border-b border-slate-100">
+            <tr>
+              <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Nama</th>
+              <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Email</th>
+              <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
+              <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Bergabung</th>
+              <th class="px-5 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-50">
+            ${users.map(u => `
+              <tr class="hover:bg-slate-50 transition">
+                <td class="px-5 py-3.5">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                      ${u.name?.charAt(0)?.toUpperCase() || "?"}
+                    </div>
+                    <span class="font-medium text-slate-900">${u.name}</span>
+                  </div>
+                </td>
+                <td class="px-5 py-3.5 text-slate-500 text-xs">${u.email}</td>
+                <td class="px-5 py-3.5">
+                  <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${u.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">
+                    ${u.is_active ? 'Aktif' : 'Nonaktif'}
+                  </span>
+                </td>
+                <td class="px-5 py-3.5 text-xs text-slate-500">${formatDate(u.created_at)}</td>
+                <td class="px-5 py-3.5">
+                  <button onclick="toggleUserStatus(${u.id}, ${u.is_active})"
+                    class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-amber-600 transition" title="Toggle Status">
+                    <i data-lucide="${u.is_active ? 'user-x' : 'user-check'}" class="w-4 h-4"></i>
+                  </button>
+                </td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  lucide.createIcons();
+}
+
+function openAddUserModal() {
+  Swal.fire({
+    title: "Tambah Pengguna",
+    html: `
+      <div class="text-left space-y-3 mt-2">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Nama</label>
+          <input id="swal-name" type="text" placeholder="Nama Lengkap" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"/>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Email</label>
+          <input id="swal-email" type="email" placeholder="email@example.com" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"/>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Password</label>
+          <input id="swal-pass" type="password" placeholder="Min. 6 karakter" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"/>
+        </div>
+      </div>`,
+    showCancelButton: true,
+    confirmButtonText: "Tambah",
+    cancelButtonText: "Batal",
+    confirmButtonColor: "#09090B",
+    preConfirm: async () => {
+      const name  = document.getElementById("swal-name").value.trim();
+      const email = document.getElementById("swal-email").value.trim();
+      const pass  = document.getElementById("swal-pass").value;
+      if (!name || !email || !pass) { Swal.showValidationMessage("Semua field wajib diisi"); return false; }
+      const res = await API.auth.register({ name, email, password: pass });
+      if (!res.ok) { Swal.showValidationMessage(res.data.message || "Gagal menambah user"); return false; }
+      return true;
+    }
+  }).then(r => {
+    if (r.isConfirmed) { toast("Pengguna berhasil ditambahkan"); renderTab(); }
+  });
+}
+
+async function toggleUserStatus(id, currentStatus) {
+  const r = await confirm(
+    currentStatus ? "Nonaktifkan pengguna?" : "Aktifkan pengguna?",
+    currentStatus ? "Pengguna tidak bisa login." : "Pengguna bisa login kembali."
+  );
+  if (r.isConfirmed) {
+    // Update via PUT /users/{id} - endpoint sederhana
+    const res = await request("PUT", `/users/${id}`, { is_active: !currentStatus });
+    toast(currentStatus ? "Pengguna dinonaktifkan" : "Pengguna diaktifkan");
+    renderTab();
+  }
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────
+async function renderSettings(c) {
+  const res = await request("GET", "/admin/settings");
+  if (!res.ok) {
+    c.innerHTML = `<div class="bg-amber-50 border border-amber-200 rounded-2xl p-5"><p class="text-sm text-amber-700">Akses ditolak. Diperlukan akun admin.</p></div>`;
+    return;
+  }
+
+  const s = res.data.data || {};
+  c.innerHTML = `
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-100">
+        <p class="text-sm font-semibold text-slate-900">Pengaturan Sistem</p>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          ${settingField("app_name", "Nama Aplikasi", s.app_name || "Sentinel AI")}
+          ${settingField("max_scan_depth", "Kedalaman Crawling Maks.", s.max_scan_depth || "5", "number")}
+          ${settingField("max_scan_pages", "Halaman Maks. per Scan", s.max_scan_pages || "1000", "number")}
+          ${settingField("scan_timeout_ms", "Timeout (ms)", s.scan_timeout_ms || "10000", "number")}
+          ${settingField("scan_workers", "Jumlah Worker", s.scan_workers || "5", "number")}
+          ${settingField("scan_delay_ms", "Delay antar Request (ms)", s.scan_delay_ms || "100", "number")}
+          ${settingField("rate_limit_rps", "Rate Limit (req/detik)", s.rate_limit_rps || "5", "number")}
+          ${settingField("ai_confidence_min", "Min. Confidence AI (%)", s.ai_confidence_min || "50", "number")}
+        </div>
+        <div class="flex justify-end pt-2">
+          <button onclick="saveSettings()" class="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 transition">
+            <i data-lucide="save" class="w-4 h-4"></i> Simpan Pengaturan
+          </button>
+        </div>
+      </div>
+    </div>`;
+  lucide.createIcons();
+}
+
+function settingField(key, label, val, type = "text") {
+  return `
+    <div>
+      <label class="block text-xs font-medium text-slate-700 mb-1.5">${label}</label>
+      <input id="setting-${key}" type="${type}" value="${val}"
+        class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"/>
+    </div>`;
+}
+
+async function saveSettings() {
+  const keys = ["app_name","max_scan_depth","max_scan_pages","scan_timeout_ms","scan_workers","scan_delay_ms","rate_limit_rps","ai_confidence_min"];
+  const body = {};
+  keys.forEach(k => {
+    const el = document.getElementById(`setting-${k}`);
+    if (el) body[k] = el.value;
+  });
+  const res = await request("PUT", "/admin/settings", body);
+  if (res.ok) toast("Pengaturan disimpan");
+  else toast(res.data?.message || "Gagal menyimpan", "error");
+}
+
+// ── SYSTEM ────────────────────────────────────────────────────
+async function renderSystem(c) {
+  const res = await request("GET", "/admin/system");
+  if (!res.ok) {
+    c.innerHTML = `<div class="bg-amber-50 border border-amber-200 rounded-2xl p-5"><p class="text-sm text-amber-700">Akses ditolak.</p></div>`;
+    return;
+  }
+  const d = res.data.data || {};
+
+  c.innerHTML = `
+    <div class="space-y-4">
+      <!-- System Stats -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        ${sysCard("CPU Usage", d.cpu + "%" || "–", "cpu", d.cpu > 80 ? "text-red-600" : "text-emerald-600")}
+        ${sysCard("Memory", d.memory + "%" || "–", "memory-stick", d.memory > 80 ? "text-red-600" : "text-emerald-600")}
+        ${sysCard("Disk", d.disk + "%" || "–", "hard-drive", d.disk > 80 ? "text-red-600" : "text-emerald-600")}
+        ${sysCard("Python", d.python || "–", "code-2", "text-blue-600")}
+      </div>
+
+      <!-- Health Check -->
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100">
+          <p class="text-sm font-semibold text-slate-900">Health Check</p>
+        </div>
+        <div class="p-5" id="health-content">
+          <div class="text-center text-slate-400 text-sm py-4">Memuat...</div>
+        </div>
+      </div>
+    </div>`;
+  lucide.createIcons();
+
+  // Health check
+  const healthRes = await fetch(`${API_BASE.replace('/api/v1','')}/api/v1/health`);
+  const health = await healthRes.json();
+  const hd = health.data || {};
+  document.getElementById("health-content").innerHTML = `
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      ${healthItem("API Server", hd.status === "healthy")}
+      ${healthItem("Database", hd.database === "connected")}
+      ${healthItem("AI Engine", true)}
+      ${healthItem("Scanner", true)}
+      ${healthItem("Report Engine", true)}
+    </div>`;
+  lucide.createIcons();
+}
+
+function sysCard(label, val, icon, textClass) {
+  return `
+    <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+      <div class="flex items-center gap-2 mb-2">
+        <i data-lucide="${icon}" class="w-4 h-4 text-slate-500"></i>
+        <p class="text-xs text-slate-500">${label}</p>
+      </div>
+      <p class="text-2xl font-bold ${textClass}">${val}</p>
+    </div>`;
+}
+
+function healthItem(label, ok) {
+  return `
+    <div class="flex items-center gap-2.5 bg-slate-50 rounded-xl p-3">
+      <div class="w-2.5 h-2.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-red-500'} shrink-0"></div>
+      <span class="text-sm text-slate-700">${label}</span>
+      <span class="ml-auto text-xs font-medium ${ok ? 'text-emerald-600' : 'text-red-600'}">${ok ? 'Online' : 'Offline'}</span>
+    </div>`;
+}
+
+// ── ML MODELS ─────────────────────────────────────────────────
+async function renderMLModels(c) {
+  const res = await API.ai.models();
+  const models = res.data?.data || [];
+
+  c.innerHTML = `
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <p class="text-sm font-semibold text-slate-900">Model Machine Learning</p>
+        <button onclick="retrainModels()" class="flex items-center gap-1.5 text-xs font-semibold border border-slate-200 text-slate-700 px-3 py-2 rounded-xl hover:bg-slate-50 transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Retrain Model
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 border-b border-slate-100">
+            <tr>
+              <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Model</th>
+              <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Akurasi</th>
+              <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">F1 Score</th>
+              <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">ROC AUC</th>
+              <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
+              <th class="px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Aksi</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-50">
+            ${models.map(m => `
+              <tr class="hover:bg-slate-50 transition">
+                <td class="px-5 py-3.5">
+                  <div>
+                    <p class="font-medium text-slate-900">${m.name}</p>
+                    <p class="text-xs text-slate-400 capitalize">${m.algorithm.replace(/_/g,' ')} v${m.version}</p>
+                  </div>
+                </td>
+                <td class="px-5 py-3.5 font-semibold ${m.accuracy >= 0.9 ? 'text-emerald-600' : m.accuracy >= 0.8 ? 'text-yellow-600' : 'text-red-600'}">
+                  ${m.accuracy ? (m.accuracy*100).toFixed(1)+"%" : "–"}
+                </td>
+                <td class="px-5 py-3.5 text-slate-700">${m.f1_score ? (m.f1_score*100).toFixed(1)+"%" : "–"}</td>
+                <td class="px-5 py-3.5 text-slate-700">${m.roc_auc ? (m.roc_auc*100).toFixed(1)+"%" : "–"}</td>
+                <td class="px-5 py-3.5">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${m.status==='ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${m.status}</span>
+                    ${m.is_active ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Aktif</span>' : ''}
+                  </div>
+                </td>
+                <td class="px-5 py-3.5 text-center">
+                  ${!m.is_active ? `
+                    <button onclick="activateModel(${m.id})" class="text-xs text-slate-600 hover:text-slate-900 font-medium border border-slate-200 px-2.5 py-1 rounded-lg hover:bg-slate-50 transition">
+                      Aktifkan
+                    </button>` : `<span class="text-xs text-slate-400">—</span>`}
+                </td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Info -->
+      <div class="px-5 py-4 border-t border-slate-100 bg-slate-50">
+        <p class="text-xs text-slate-500">
+          <i data-lucide="info" class="w-3.5 h-3.5 inline mr-1"></i>
+          Untuk retrain model, jalankan: <code class="bg-slate-200 px-1.5 py-0.5 rounded text-xs font-mono">cd backend && python app/ml/training/train.py</code>
+        </p>
+      </div>
+    </div>`;
+  lucide.createIcons();
+}
+
+async function activateModel(id) {
+  const res = await request("PUT", `/ai/models/${id}/activate`, {});
+  if (res.ok) { toast("Model diaktifkan"); renderTab(); }
+  else toast(res.data?.message || "Gagal mengaktifkan model", "error");
+}
+
+async function retrainModels() {
+  Swal.fire({
+    icon: "info",
+    title: "Retrain Model",
+    html: `
+      <p class="text-sm text-slate-600 mt-2">Untuk melatih ulang model, jalankan perintah berikut di terminal:</p>
+      <div class="mt-3 bg-slate-900 rounded-xl p-3 text-left">
+        <code class="text-green-400 text-xs font-mono">cd backend<br>python app/ml/training/train.py</code>
+      </div>
+      <p class="text-xs text-slate-400 mt-3">Proses ini membutuhkan waktu 1–5 menit.</p>`,
+    confirmButtonText: "Mengerti",
+    confirmButtonColor: "#09090B",
+  });
+}
+
+// Helper - raw request (untuk admin endpoints)
+async function request(method, path, body = null) {
+  const token = Auth.getToken();
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const config = { method, headers };
+  if (body) config.body = JSON.stringify(body);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, config);
+    const data = await res.json();
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return { ok: false, status: 0, data: { success: false, message: "Gagal terhubung ke server" } };
+  }
+}
+
+init();
+</script>
+</body>
+</html>

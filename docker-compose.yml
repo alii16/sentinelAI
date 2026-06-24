@@ -1,0 +1,64 @@
+version: '3.9'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: sentinel_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-sentinel123}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-sentinel_ai}
+      MYSQL_USER: sentinel
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sentinel123}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend FastAPI
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    container_name: sentinel_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MYSQL_HOST: mysql
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+      - ./reports:/app/reports
+      - ./storage:/app/storage
+      - ./models:/app/models
+      - ./datasets:/app/datasets
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Nginx (Frontend + Reverse Proxy)
+  nginx:
+    image: nginx:alpine
+    container_name: sentinel_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:

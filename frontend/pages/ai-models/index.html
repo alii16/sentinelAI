@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>AI Models – Sentinel AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={theme:{extend:{fontFamily:{sans:["Inter","sans-serif"]}}}}</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/layout.js"></script>
+</head>
+<body class="bg-slate-50 font-sans">
+<div id="app-layout"></div>
+<script>
+authGuard();
+renderLayout("ai-models");
+document.getElementById("breadcrumb-title").textContent = "AI Models";
+
+async function loadModels() {
+  const c = document.getElementById("models-container");
+  c.innerHTML = `<div class="p-6">${skeleton(4)}</div>`;
+  const res = await API.ai.models();
+  if (!res.ok) { c.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm">Gagal memuat model</div>`; return; }
+  const models = res.data.data || [];
+
+  c.innerHTML = `
+    <div class="space-y-5">
+      <!-- Model Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        ${models.map(m => `
+          <div class="bg-white border-2 ${m.is_active ? 'border-slate-900' : 'border-slate-200'} rounded-2xl p-5 shadow-sm relative">
+            ${m.is_active ? `<div class="absolute top-3 right-3"><span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200">Aktif</span></div>` : ""}
+            <div class="flex items-start gap-3 mb-4">
+              <div class="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
+                <i data-lucide="brain" class="w-5 h-5 text-slate-600"></i>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-slate-900">${m.name}</p>
+                <p class="text-xs text-slate-500">${m.algorithm.replace(/_/g," ").toUpperCase()} v${m.version}</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3 mb-4">
+              ${metricBox("Accuracy", m.accuracy)}
+              ${metricBox("F1 Score", m.f1_score)}
+              ${metricBox("ROC AUC",  m.roc_auc)}
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              ${metricRow("Precision", m.precision_score)}
+              ${metricRow("Recall",    m.recall_score)}
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+              <span class="text-xs text-slate-400">Dilatih: ${m.trained_at ? formatDate(m.trained_at) : "–"}</span>
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium ${m.status==='ready' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${m.status}</span>
+            </div>
+          </div>`).join("")}
+      </div>
+
+      <!-- Benchmark Chart -->
+      ${models.length > 0 ? `
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <p class="text-sm font-semibold text-slate-900 mb-4">Perbandingan Performa Model</p>
+        <canvas id="benchmark-chart" class="max-h-64"></canvas>
+      </div>` : ""}
+    </div>`;
+
+  lucide.createIcons();
+
+  // Benchmark chart
+  if (models.length > 0) {
+    const colors = ["#09090B","#3b82f6","#f59e0b","#10b981"];
+    new Chart(document.getElementById("benchmark-chart"), {
+      type: "bar",
+      data: {
+        labels: ["Accuracy","Precision","Recall","F1 Score","ROC AUC"],
+        datasets: models.map((m, i) => ({
+          label: m.algorithm.replace(/_/g," ").toUpperCase(),
+          data: [m.accuracy, m.precision_score, m.recall_score, m.f1_score, m.roc_auc].map(v => v ? (v*100).toFixed(1) : 0),
+          backgroundColor: colors[i % colors.length] + "CC",
+          borderColor: colors[i % colors.length],
+          borderWidth: 1,
+          borderRadius: 6,
+        }))
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "top", labels: { font: { size: 11 } } } },
+        scales: {
+          y: { min: 0, max: 100, ticks: { callback: v => v + "%" }, grid: { color: "#f1f5f9" } },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+  }
+}
+
+function metricBox(label, val) {
+  const pct = val ? (val * 100).toFixed(1) : "–";
+  const color = val >= 0.9 ? "text-emerald-600" : val >= 0.8 ? "text-yellow-600" : "text-red-600";
+  return `<div class="bg-slate-50 rounded-xl p-2.5 text-center"><p class="text-base font-bold ${color}">${pct}${val ? "%" : ""}</p><p class="text-xs text-slate-500">${label}</p></div>`;
+}
+function metricRow(label, val) {
+  return `<div class="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2"><span class="text-slate-500">${label}</span><span class="font-semibold text-slate-900">${val ? (val*100).toFixed(1)+"%" : "–"}</span></div>`;
+}
+
+document.getElementById("page-content").innerHTML = `
+  <div class="space-y-5">
+    <div><h1 class="text-xl font-bold text-slate-900">AI Models</h1><p class="text-sm text-slate-500">Model Machine Learning yang digunakan untuk klasifikasi kerentanan</p></div>
+    <div id="models-container"></div>
+  </div>`;
+
+loadModels();
+</script>
+</body>
+</html>

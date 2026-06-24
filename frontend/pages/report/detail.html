@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laporan – Sentinel AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { fontFamily: { sans: ["Inter","sans-serif"] } } } }</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/layout.js"></script>
+</head>
+<body class="bg-slate-50 font-sans">
+<div id="app-layout"></div>
+
+<script>
+authGuard();
+renderLayout("reports");
+document.getElementById("breadcrumb-title").textContent = "Detail Laporan";
+
+const params = new URLSearchParams(window.location.search);
+const scanId = params.get("scan_id");
+
+if (!scanId) {
+  document.getElementById("page-content").innerHTML = `<div class="text-center py-20 text-slate-400">Scan ID tidak ditemukan</div>`;
+} else {
+  loadReport();
+}
+
+async function loadReport() {
+  const content = document.getElementById("page-content");
+  content.innerHTML = `<div class="space-y-4">${skeleton(8)}</div>`;
+
+  const [scanRes, predsRes, recsRes, techRes] = await Promise.all([
+    API.scans.get(scanId),
+    API.ai.predictions(scanId),
+    API.ai.recommendations(scanId),
+    API.ai.summary(scanId),
+  ]);
+
+  if (!scanRes.ok) { content.innerHTML = `<div class="text-center py-20 text-slate-400">Laporan tidak ditemukan</div>`; return; }
+
+  const scan = scanRes.data.data;
+  const preds = predsRes.data?.data || [];
+  const recs  = recsRes.data?.data || [];
+  const score = scan.security_score || 0;
+  const grade = scan.grade || "–";
+
+  // Get report for download links
+  const repsRes = await API.reports.list();
+  const report  = (repsRes.data?.data || []).find(r => r.scan_id === parseInt(scanId));
+  const reportId = report?.id;
+  const hasPdf = report?.has_pdf;
+  const hasJson = report?.has_json;
+  const hasCsv = report?.has_csv;
+
+  content.innerHTML = `
+    <div class="max-w-5xl mx-auto space-y-5">
+
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h1 class="text-xl font-bold text-slate-900">Laporan Audit Keamanan</h1>
+          <p class="text-sm text-slate-500 mt-0.5">Scan #${scan.id} • ${formatDate(scan.completed_at)}</p>
+        </div>
+        ${reportId ? `
+        <div class="flex gap-2 flex-wrap">
+          ${hasPdf ? `<button type="button" onclick="downloadReport(${reportId}, 'pdf')"
+             class="flex items-center gap-1.5 px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold hover:bg-red-100 transition">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i> PDF
+          </button>` : ""}
+          ${hasJson ? `<button type="button" onclick="downloadReport(${reportId}, 'json')"
+             class="flex items-center gap-1.5 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-xs font-semibold hover:bg-blue-100 transition">
+            <i data-lucide="code-2" class="w-3.5 h-3.5"></i> JSON
+          </button>` : ""}
+          ${hasCsv ? `<button type="button" onclick="downloadReport(${reportId}, 'csv')"
+             class="flex items-center gap-1.5 px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-xl text-xs font-semibold hover:bg-green-100 transition">
+            <i data-lucide="table" class="w-3.5 h-3.5"></i> CSV
+          </button>` : ""}
+          ${(!hasPdf && !hasJson && !hasCsv) ? `<span class="text-xs text-slate-500">File export belum tersedia untuk laporan ini.</span>` : ""}
+        </div>` : ""}
+      </div>
+
+      <!-- Score Card -->
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
+          <div class="text-center">
+            <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Security Score</p>
+            <p class="text-5xl font-bold ${scoreColor(score)}">${score.toFixed(1)}</p>
+            <p class="text-xs text-slate-400 mt-1">dari 100</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Grade</p>
+            <p class="text-5xl font-bold ${gradeColor(grade)}">${grade}</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Risk Level</p>
+            <p class="text-2xl font-bold text-slate-900 mt-3">${(scan.risk_level||"–").toUpperCase()}</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Durasi</p>
+            <p class="text-2xl font-bold text-slate-900 mt-3">${formatDuration(scan.duration_seconds)}</p>
+          </div>
+        </div>
+
+        <!-- Score bar -->
+        <div class="mt-6">
+          <div class="flex justify-between text-xs text-slate-400 mb-1">
+            <span>0</span><span>50</span><span>100</span>
+          </div>
+          <div class="relative h-3 bg-gradient-to-r from-red-400 via-yellow-400 to-emerald-400 rounded-full overflow-hidden">
+            <div class="absolute top-0 right-0 h-full bg-slate-200/70 rounded-r-full transition-all" style="width:${100-score}%"></div>
+            <div class="absolute h-full w-0.5 bg-white" style="left:${score}%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-4 gap-3">
+        ${miniStat("Critical", scan.critical_count||0, "bg-red-50 border-red-200", "text-red-700")}
+        ${miniStat("High",     scan.high_count||0,     "bg-orange-50 border-orange-200", "text-orange-700")}
+        ${miniStat("Medium",   scan.medium_count||0,   "bg-yellow-50 border-yellow-200", "text-yellow-700")}
+        ${miniStat("Low",      scan.low_count||0,      "bg-green-50 border-green-200", "text-green-700")}
+      </div>
+
+      <!-- Scan Info -->
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+        <h3 class="text-sm font-semibold text-slate-900 mb-4">Informasi Scan</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+          ${infoRow("Mode", scan.mode?.toUpperCase())}
+          ${infoRow("Total Halaman", scan.total_pages)}
+          ${infoRow("Total Endpoint", scan.total_endpoints)}
+          ${infoRow("Total Temuan", scan.total_findings)}
+          ${infoRow("Dimulai", formatDate(scan.started_at))}
+          ${infoRow("Selesai", formatDate(scan.completed_at))}
+        </div>
+      </div>
+
+      <!-- Findings -->
+      ${preds.length > 0 ? `
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-slate-900">Temuan Keamanan <span class="ml-1 px-2 py-0.5 bg-slate-100 rounded-full text-xs text-slate-600">${preds.length}</span></h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">#</th>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Temuan</th>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Severity</th>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Confidence</th>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">OWASP</th>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">CWE</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+              ${preds.map((p,i) => `
+                <tr class="hover:bg-slate-50">
+                  <td class="px-5 py-3.5 text-xs text-slate-400">${i+1}</td>
+                  <td class="px-5 py-3.5 font-medium text-slate-900">${p.prediction}</td>
+                  <td class="px-5 py-3.5">${severityBadge(p.severity)}</td>
+                  <td class="px-5 py-3.5">
+                    <div class="flex items-center gap-2">
+                      <div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full ${p.confidence >= 90 ? 'bg-emerald-500' : p.confidence >= 70 ? 'bg-yellow-500' : 'bg-red-500'}" style="width:${p.confidence}%"></div>
+                      </div>
+                      <span class="text-xs font-semibold text-slate-700">${p.confidence.toFixed(0)}%</span>
+                    </div>
+                  </td>
+                  <td class="px-5 py-3.5 text-xs text-slate-500">${p.owasp_category || "–"}</td>
+                  <td class="px-5 py-3.5 text-xs text-slate-500">${p.cwe_id || "–"}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>` : ""}
+
+      <!-- Recommendations -->
+      ${recs.length > 0 ? `
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-slate-900">Rekomendasi Perbaikan <span class="ml-1 px-2 py-0.5 bg-slate-100 rounded-full text-xs text-slate-600">${recs.length}</span></h3>
+        ${recs.map((r,i) => `
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
+              <div class="flex items-start gap-3">
+                <span class="w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">${i+1}</span>
+                <div>
+                  <p class="text-sm font-semibold text-slate-900">${r.title}</p>
+                  <div class="flex items-center gap-2 mt-1">
+                    ${severityBadge(r.priority)}
+                    ${r.owasp_ref ? `<span class="text-xs text-slate-400">${r.owasp_ref}</span>` : ""}
+                    ${r.cvss_score ? `<span class="text-xs text-slate-400">CVSS ${r.cvss_score}</span>` : ""}
+                  </div>
+                </div>
+              </div>
+              <button onclick="toggleRec(${i})" class="p-1 rounded-lg hover:bg-slate-100 text-slate-400 shrink-0">
+                <i data-lucide="chevron-down" class="w-4 h-4 transition" id="rec-chevron-${i}"></i>
+              </button>
+            </div>
+            <div id="rec-detail-${i}" class="hidden px-5 py-4 space-y-3 text-sm">
+              ${r.cause ? `<div><p class="text-xs font-semibold text-slate-500 uppercase mb-1">Penyebab</p><p class="text-slate-700">${r.cause}</p></div>` : ""}
+              ${r.impact ? `<div><p class="text-xs font-semibold text-slate-500 uppercase mb-1">Dampak</p><p class="text-slate-700">${r.impact}</p></div>` : ""}
+              ${r.solution ? `<div><p class="text-xs font-semibold text-slate-500 uppercase mb-1">Solusi</p><p class="text-slate-700">${r.solution}</p></div>` : ""}
+              ${r.checklist?.length ? `
+                <div>
+                  <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Checklist Perbaikan</p>
+                  <ul class="space-y-1.5">
+                    ${r.checklist.map(c => `
+                      <li class="flex items-start gap-2 text-slate-700">
+                        <i data-lucide="circle-check" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                        ${c}
+                      </li>`).join("")}
+                  </ul>
+                </div>` : ""}
+              ${r.affected_url ? `<div><p class="text-xs font-semibold text-slate-500 uppercase mb-1">URL Terpengaruh</p><p class="text-xs text-slate-500 font-mono break-all">${r.affected_url}</p></div>` : ""}
+            </div>
+          </div>
+        `).join("")}
+      </div>` : ""}
+
+      <!-- AI Chat CTA -->
+      <div class="bg-slate-900 rounded-2xl p-5 flex items-center justify-between gap-4">
+        <div>
+          <p class="text-white font-semibold">Punya pertanyaan tentang laporan ini?</p>
+          <p class="text-slate-400 text-sm mt-0.5">Tanyakan kepada AI Security Assistant kami</p>
+        </div>
+        <a href="../ai-chat/index.html?scan_id=${scanId}"
+           class="shrink-0 flex items-center gap-2 bg-white text-slate-900 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-100 transition">
+          <i data-lucide="bot" class="w-4 h-4"></i> Tanya AI
+        </a>
+      </div>
+
+    </div>`;
+  lucide.createIcons();
+}
+
+async function downloadReport(reportId, type) {
+  const res = await API.reports.download(reportId, type);
+  if (!res.ok) {
+    const errorMessage = res.data?.message || res.data?.detail || `Gagal mengunduh ${type.toUpperCase()}`;
+    toast(errorMessage, "error");
+    return;
+  }
+
+  const blob = res.data;
+  const extension = type === "pdf" ? "pdf" : type === "json" ? "json" : "csv";
+  const fileName = `sentinel_report_${reportId}.${extension}`;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function miniStat(label, val, bg, text) {
+  return `<div class="border ${bg} rounded-xl p-3 text-center"><p class="text-2xl font-bold ${text}">${val}</p><p class="text-xs text-slate-500 font-medium">${label}</p></div>`;
+}
+function infoRow(label, val) {
+  return `<div><p class="text-xs text-slate-500 mb-0.5">${label}</p><p class="font-medium text-slate-900">${val || "–"}</p></div>`;
+}
+function toggleRec(i) {
+  const el = document.getElementById(`rec-detail-${i}`);
+  const ch = document.getElementById(`rec-chevron-${i}`);
+  el.classList.toggle("hidden");
+  ch.classList.toggle("rotate-180");
+}
+</script>
+</body>
+</html>
