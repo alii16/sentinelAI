@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     AI_PROVIDER: str = "groq"
 
     # Groq API configuration
-    GROQ_API_KEY: str = "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"
+    GROQ_API_KEY: str = "your_api_key"
     GROQ_MODEL: str = "llama-3.1-8b-instant"
 
     # Google Generative Language API (optional)
