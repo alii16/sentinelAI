@@ -20,7 +20,7 @@ function renderLayout(activePage = "") {
     { id: "settings",       label: "Pengaturan",     icon: "settings",         href: "../settings/index.html" },
   ];
   if (role === "admin") {
-    navItems.push({ id: "admin", label: "Admin", icon: "shield", href: "../admin/index.html" });
+    navItems.push({ id: "admin", label: "Admin", icon: "shield-user", href: "../admin/index.html" });
   }
 
   const sidebarItems = navItems.map(item => {

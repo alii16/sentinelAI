@@ -1,0 +1,131 @@
+No,Temuan,Severity,Confidence,OWASP,CWE
+1,Missing Security Headers,medium,99%,A05:2021,CWE-693
+2,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+3,Server Version Disclosure,low,98%,A05:2021,CWE-200
+4,Broken Access Control,high,75%,A01:2021,CWE-284
+5,Missing Security Headers,medium,99%,A05:2021,CWE-693
+6,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+7,Server Version Disclosure,low,98%,A05:2021,CWE-200
+8,File Upload Endpoint Detected,medium,90%,A04:2021,CWE-434
+9,Missing Security Headers,medium,99%,A05:2021,CWE-693
+10,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+11,Server Version Disclosure,low,98%,A05:2021,CWE-200
+12,Cross-Site Scripting (XSS),high,85%,A03:2021,CWE-79
+13,Missing Security Headers,medium,99%,A05:2021,CWE-693
+14,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+15,Server Version Disclosure,low,98%,A05:2021,CWE-200
+16,Missing Security Headers,medium,99%,A05:2021,CWE-693
+17,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+18,Server Version Disclosure,low,98%,A05:2021,CWE-200
+19,Cross-Site Scripting (XSS),high,85%,A03:2021,CWE-79
+20,Missing Security Headers,medium,99%,A05:2021,CWE-693
+21,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+22,Server Version Disclosure,low,98%,A05:2021,CWE-200
+23,Cross-Site Scripting (XSS),high,85%,A03:2021,CWE-79
+24,Missing Security Headers,medium,99%,A05:2021,CWE-693
+25,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+26,Server Version Disclosure,low,98%,A05:2021,CWE-200
+27,Missing Security Headers,medium,99%,A05:2021,CWE-693
+28,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+29,Server Version Disclosure,low,98%,A05:2021,CWE-200
+30,Missing Security Headers,medium,99%,A05:2021,CWE-693
+31,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+32,Missing Security Headers,medium,99%,A05:2021,CWE-693
+33,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+34,Server Version Disclosure,low,98%,A05:2021,CWE-200
+35,Missing Security Headers,medium,99%,A05:2021,CWE-693
+36,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+37,Server Version Disclosure,low,98%,A05:2021,CWE-200
+38,Missing Security Headers,medium,99%,A05:2021,CWE-693
+39,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+40,Server Version Disclosure,low,98%,A05:2021,CWE-200
+41,Missing Security Headers,medium,99%,A05:2021,CWE-693
+42,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+43,Server Version Disclosure,low,98%,A05:2021,CWE-200
+44,Server Version Disclosure,low,98%,A05:2021,CWE-200
+45,Missing Security Headers,medium,99%,A05:2021,CWE-693
+46,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+47,Server Version Disclosure,low,98%,A05:2021,CWE-200
+48,Missing Security Headers,medium,99%,A05:2021,CWE-693
+49,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+50,Server Version Disclosure,low,98%,A05:2021,CWE-200
+51,Missing Security Headers,medium,99%,A05:2021,CWE-693
+52,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+53,Server Version Disclosure,low,98%,A05:2021,CWE-200
+54,Missing Security Headers,medium,99%,A05:2021,CWE-693
+55,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+56,Server Version Disclosure,low,98%,A05:2021,CWE-200
+57,Missing Security Headers,medium,99%,A05:2021,CWE-693
+58,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+59,Server Version Disclosure,low,98%,A05:2021,CWE-200
+60,Missing Security Headers,medium,99%,A05:2021,CWE-693
+61,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+62,Information Disclosure,medium,78%,A02:2021,CWE-200
+63,Server Version Disclosure,low,98%,A05:2021,CWE-200
+64,Missing Security Headers,medium,99%,A05:2021,CWE-693
+65,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+66,Information Disclosure,medium,78%,A02:2021,CWE-200
+67,Server Version Disclosure,low,98%,A05:2021,CWE-200
+68,Missing Security Headers,medium,99%,A05:2021,CWE-693
+69,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+70,Server Version Disclosure,low,98%,A05:2021,CWE-200
+71,Missing Security Headers,medium,99%,A05:2021,CWE-693
+72,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+73,Server Version Disclosure,low,98%,A05:2021,CWE-200
+74,Missing Security Headers,medium,99%,A05:2021,CWE-693
+75,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+76,Server Version Disclosure,low,98%,A05:2021,CWE-200
+77,Missing Security Headers,medium,99%,A05:2021,CWE-693
+78,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+79,Server Version Disclosure,low,98%,A05:2021,CWE-200
+80,Missing Security Headers,medium,99%,A05:2021,CWE-693
+81,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+82,Server Version Disclosure,low,98%,A05:2021,CWE-200
+83,Missing Security Headers,medium,99%,A05:2021,CWE-693
+84,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+85,Server Version Disclosure,low,98%,A05:2021,CWE-200
+86,Missing Security Headers,medium,99%,A05:2021,CWE-693
+87,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+88,Server Version Disclosure,low,98%,A05:2021,CWE-200
+89,Missing Security Headers,medium,99%,A05:2021,CWE-693
+90,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+91,Server Version Disclosure,low,98%,A05:2021,CWE-200
+92,Missing Security Headers,medium,99%,A05:2021,CWE-693
+93,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+94,Server Version Disclosure,low,98%,A05:2021,CWE-200
+95,Missing Security Headers,medium,99%,A05:2021,CWE-693
+96,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+97,Server Version Disclosure,low,98%,A05:2021,CWE-200
+98,Missing Security Headers,medium,99%,A05:2021,CWE-693
+99,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+100,Server Version Disclosure,low,98%,A05:2021,CWE-200
+101,Missing Security Headers,medium,99%,A05:2021,CWE-693
+102,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+103,Server Version Disclosure,low,98%,A05:2021,CWE-200
+104,Missing Security Headers,medium,99%,A05:2021,CWE-693
+105,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+106,Server Version Disclosure,low,98%,A05:2021,CWE-200
+107,Missing Security Headers,medium,99%,A05:2021,CWE-693
+108,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+109,Server Version Disclosure,low,98%,A05:2021,CWE-200
+110,Missing Security Headers,medium,99%,A05:2021,CWE-693
+111,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+112,Server Version Disclosure,low,98%,A05:2021,CWE-200
+113,Missing Security Headers,medium,99%,A05:2021,CWE-693
+114,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+115,Server Version Disclosure,low,98%,A05:2021,CWE-200
+116,Missing Security Headers,medium,99%,A05:2021,CWE-693
+117,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+118,Server Version Disclosure,low,98%,A05:2021,CWE-200
+119,Missing Security Headers,medium,99%,A05:2021,CWE-693
+120,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+121,Server Version Disclosure,low,98%,A05:2021,CWE-200
+122,Missing Security Headers,medium,99%,A05:2021,CWE-693
+123,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+124,Server Version Disclosure,low,98%,A05:2021,CWE-200
+125,Missing Security Headers,medium,99%,A05:2021,CWE-693
+126,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+127,Server Version Disclosure,low,98%,A05:2021,CWE-200
+128,Missing Security Headers,medium,99%,A05:2021,CWE-693
+129,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
+130,Server Version Disclosure,low,98%,A05:2021,CWE-200
