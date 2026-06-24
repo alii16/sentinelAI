@@ -34,9 +34,9 @@ logger = logging.getLogger("sentinel.ml.train")
 
 # ── Paths ───────────────────────────────────────────────────────
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
-DATASET_DIR = os.path.join(BASE_DIR, "../datasets/processed")
-MODEL_DIR   = os.path.join(BASE_DIR, "../models/saved")
-EVAL_DIR    = os.path.join(BASE_DIR, "../models/evaluations")
+DATASET_DIR = os.path.join(BASE_DIR, "../../../../datasets/processed")
+MODEL_DIR   = os.path.join(BASE_DIR, "../../../../models/saved")
+EVAL_DIR    = os.path.join(BASE_DIR, "../../../../models/evaluations")
 
 os.makedirs(DATASET_DIR, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
@@ -173,19 +173,35 @@ def generate_synthetic_dataset(n=3000):
 
 
 def load_dataset():
-    """Load dataset from CSV files in the processed directory."""
+    """
+    Load dataset dengan prioritas:
+    1. sentinel_final_dataset.csv (hasil merge_datasets.py)
+    2. sentinel_dataset_csic.csv (hasil convert_csic.py)
+    3. sentinel_dataset_from_scans.csv (hasil export_scan_dataset.py)
+    4. File CSV lain di processed/
+    5. Generate sintetis jika tidak ada sama sekali
+    """
+    # Prioritas 1: final merged dataset
+    final_path = os.path.join(DATASET_DIR, "sentinel_final_dataset.csv")
+    if os.path.exists(final_path):
+        df = pd.read_csv(final_path)
+        logger.info(f"Loaded final dataset: {len(df)} records")
+        return df
+
+    # Prioritas 2-4: cari CSV lain
     csv_files = [f for f in os.listdir(DATASET_DIR) if f.endswith(".csv")]
     if not csv_files:
         logger.warning("No dataset found, generating synthetic data...")
         return generate_synthetic_dataset()
-    
+
     dfs = []
     for f in csv_files:
         try:
             dfs.append(pd.read_csv(os.path.join(DATASET_DIR, f)))
+            logger.info(f"Loaded: {f}")
         except Exception as e:
             logger.warning(f"Could not read {f}: {e}")
-    
+
     df = pd.concat(dfs, ignore_index=True) if dfs else generate_synthetic_dataset()
     logger.info(f"Loaded {len(df)} records from {len(csv_files)} file(s)")
     return df
@@ -259,6 +275,172 @@ def evaluate_model(model, X_test, y_test, model_name, le):
     return metrics
 
 
+def sync_to_database(results: dict, best_model_name: str, total_samples: int):
+    """
+    Sync hasil training ke tabel ml_models di database.
+    Menggunakan pymysql langsung (sync) karena train.py dijalankan
+    sebagai script terpisah, bukan dalam konteks FastAPI async.
+    """
+    logger.info("\n── Menyinkronkan hasil ke database...")
+
+    # Load .env untuk koneksi database
+    env_path = os.path.join(BASE_DIR, "../../../../.env")
+    db_config = {
+        "host":     "localhost",
+        "port":     3306,
+        "user":     "root",
+        "password": "",
+        "database": "sentinel_ai",
+        "charset":  "utf8mb4",
+    }
+
+    # Baca .env jika ada
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                key = key.strip()
+                val = val.strip().strip('"').strip("'")
+                if key == "MYSQL_HOST":     db_config["host"]     = val
+                if key == "MYSQL_PORT":     db_config["port"]     = int(val or 3306)
+                if key == "MYSQL_USERNAME": db_config["user"]     = val
+                if key == "MYSQL_PASSWORD": db_config["password"] = val
+                if key == "MYSQL_DATABASE": db_config["database"] = val
+
+    # Map nama model ke algorithm slug di database
+    algo_map = {
+        "Random Forest": "random_forest",
+        "XGBoost":       "xgboost",
+        "Decision Tree": "decision_tree",
+        "SVM":           "svm",
+    }
+
+    try:
+        import pymysql
+        conn = pymysql.connect(**db_config)
+        cursor = conn.cursor()
+
+        for name, result in results.items():
+            metrics = result["metrics"]
+            algo    = algo_map.get(name, name.lower().replace(" ", "_"))
+            f_path  = metrics.get("file_path", "")
+
+            # Buat path relatif (relatif dari folder backend/)
+            try:
+                backend_dir = os.path.join(BASE_DIR, "../../../..")
+                backend_dir = os.path.abspath(backend_dir)
+                rel_path = os.path.relpath(f_path, backend_dir)
+                rel_path = rel_path.replace("\\", "/")
+            except Exception:
+                rel_path = f_path
+
+            is_active  = 1 if name == best_model_name else 0
+            trained_at = time.strftime("%Y-%m-%d %H:%M:%S")
+
+            # Cek apakah record sudah ada
+            cursor.execute("SELECT id FROM ml_models WHERE algorithm = %s", (algo,))
+            row = cursor.fetchone()
+
+            if row:
+                # Update record yang ada
+                cursor.execute("""
+                    UPDATE ml_models SET
+                        accuracy        = %s,
+                        precision_score = %s,
+                        recall_score    = %s,
+                        f1_score        = %s,
+                        roc_auc         = %s,
+                        training_time   = %s,
+                        sample_count    = %s,
+                        feature_count   = %s,
+                        file_path       = %s,
+                        is_active       = %s,
+                        status          = 'ready',
+                        trained_at      = %s
+                    WHERE algorithm = %s
+                """, (
+                    round(metrics["accuracy"], 4),
+                    round(metrics["precision"], 4),
+                    round(metrics["recall"], 4),
+                    round(metrics["f1"], 4),
+                    round(metrics["roc_auc"], 4),
+                    round(metrics["training_time"], 3),
+                    total_samples,
+                    len(FEATURE_COLS),
+                    rel_path,
+                    is_active,
+                    trained_at,
+                    algo,
+                ))
+                logger.info(f"  ✓ Updated: {name} (Acc={metrics['accuracy']:.4f} F1={metrics['f1']:.4f})")
+            else:
+                # Insert record baru
+                version = "1.0"
+                model_name = f"{name} v{version}"
+                cursor.execute("""
+                    INSERT INTO ml_models
+                        (name, algorithm, version, accuracy, precision_score,
+                         recall_score, f1_score, roc_auc, training_time,
+                         sample_count, feature_count, file_path, is_active,
+                         status, trained_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'ready', %s)
+                """, (
+                    model_name, algo, version,
+                    round(metrics["accuracy"], 4),
+                    round(metrics["precision"], 4),
+                    round(metrics["recall"], 4),
+                    round(metrics["f1"], 4),
+                    round(metrics["roc_auc"], 4),
+                    round(metrics["training_time"], 3),
+                    total_samples,
+                    len(FEATURE_COLS),
+                    rel_path,
+                    is_active,
+                    trained_at,
+                ))
+                logger.info(f"  ✓ Inserted: {name}")
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        logger.info("  ✓ Database berhasil disinkronkan!")
+
+    except ImportError:
+        logger.warning("  ⚠ pymysql tidak terinstall. Jalankan: pip install pymysql")
+        logger.warning("  ⚠ Update database secara manual via phpMyAdmin.")
+        _print_manual_sql(results, best_model_name, algo_map)
+    except Exception as e:
+        logger.error(f"  ✗ Gagal sync ke database: {e}")
+        logger.warning("  ⚠ Update database secara manual via phpMyAdmin:")
+        _print_manual_sql(results, best_model_name, algo_map)
+
+
+def _print_manual_sql(results: dict, best_model_name: str, algo_map: dict):
+    """Print SQL UPDATE statements jika database sync gagal."""
+    logger.info("\n  SQL untuk update manual di phpMyAdmin:")
+    logger.info("  " + "-" * 50)
+    for name, result in results.items():
+        m    = result["metrics"]
+        algo = algo_map.get(name, name.lower().replace(" ", "_"))
+        active = 1 if name == best_model_name else 0
+        sql = (
+            f"  UPDATE ml_models SET "
+            f"accuracy={m['accuracy']:.4f}, "
+            f"precision_score={m['precision']:.4f}, "
+            f"recall_score={m['recall']:.4f}, "
+            f"f1_score={m['f1']:.4f}, "
+            f"roc_auc={m['roc_auc']:.4f}, "
+            f"is_active={active}, status='ready', "
+            f"trained_at=NOW() "
+            f"WHERE algorithm='{algo}';"
+        )
+        logger.info(sql)
+    logger.info("  " + "-" * 50)
+
+
 def train_all():
     """Main training pipeline."""
     logger.info("=" * 60)
@@ -328,7 +510,7 @@ def train_all():
 
     # Save evaluation report
     report = {
-        "trained_at": time.strftime("%Y-%m-%d %Human:%M:%S"),
+        "trained_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "best_model": best_model_name,
         "models": {
             name: {k: v for k, v in res["metrics"].items() if k != "model"}
@@ -337,6 +519,9 @@ def train_all():
     }
     with open(os.path.join(EVAL_DIR, "evaluation_report.json"), "w") as f:
         json.dump(report, f, indent=2)
+
+    # ── Sync hasil training ke database ──────────────────────────
+    sync_to_database(results, best_model_name, len(df))
 
     # Feature importance chart (Random Forest + XGBoost)
     for model_name in ["Random Forest", "XGBoost"]:
