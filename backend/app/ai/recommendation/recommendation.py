@@ -1,4 +1,9 @@
-"""Sentinel AI - Recommendation Agent."""
+"""
+Sentinel AI - Recommendation Agent
+Generates one actionable recommendation per unique finding type.
+Each recommendation includes cause, impact, solution, OWASP/CWE ref,
+CVSS score, and an actionable checklist.
+"""
 import logging
 from typing import List, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,181 +11,222 @@ from app.models.models import Recommendation
 
 logger = logging.getLogger("sentinel.recommendation")
 
-RECOMMENDATION_TEMPLATES = {
+# ── Recommendation templates ─────────────────────────────────────
+TEMPLATES: Dict[str, dict] = {
     "SQL Injection": {
-        "title": "Perbaiki Kerentanan SQL Injection",
-        "cause": "Input pengguna tidak divalidasi atau disanitasi sebelum digunakan dalam kueri SQL.",
-        "impact": "Penyerang dapat membaca, memodifikasi, atau menghapus data sensitif dari database.",
-        "solution": "Gunakan Prepared Statements / Parameterized Queries. Jangan pernah menggabungkan input pengguna langsung ke dalam kueri SQL. Gunakan ORM seperti Eloquent atau SQLAlchemy.",
+        "title":     "Perbaiki Kerentanan SQL Injection",
+        "cause":     "Input pengguna dimasukkan langsung ke dalam kueri SQL tanpa validasi atau sanitasi, memungkinkan penyerang memanipulasi logika database.",
+        "impact":    "Penyerang dapat membaca, mengubah, atau menghapus data sensitif dari database, bahkan mengambil alih server dalam kasus tertentu. Ini adalah kerentanan dengan dampak tertinggi.",
+        "solution":  "Gunakan Prepared Statements atau Parameterized Queries di seluruh kode. Hindari string concatenation untuk membangun kueri SQL. Terapkan ORM (Eloquent, SQLAlchemy) sebagai lapisan abstraksi.",
         "owasp_ref": "A03:2021 - Injection",
-        "cwe_ref": "CWE-89",
-        "cvss": 9.8,
+        "cwe_ref":   "CWE-89",
+        "cvss":       9.8,
+        "priority":  "critical",
         "checklist": [
-            "Ganti query dinamis dengan prepared statements",
-            "Validasi tipe data input",
-            "Batasi hak akses database (prinsip least privilege)",
-            "Aktifkan WAF (Web Application Firewall)",
-            "Log dan monitor query yang mencurigakan"
+            "Ganti semua query dinamis dengan prepared statements / parameterized queries",
+            "Gunakan ORM (Eloquent, SQLAlchemy, Hibernate) untuk akses database",
+            "Terapkan validasi whitelist pada semua input pengguna",
+            "Batasi hak akses akun database (prinsip least privilege)",
+            "Aktifkan WAF (Web Application Firewall) dengan aturan SQLi",
+            "Monitor dan catat semua query yang mencurigakan",
+            "Lakukan code review menyeluruh pada semua titik yang menerima input",
         ]
     },
     "Cross-Site Scripting (XSS)": {
-        "title": "Perbaiki Kerentanan Cross-Site Scripting (XSS)",
-        "cause": "Aplikasi menampilkan data yang dimasukkan pengguna tanpa encoding atau sanitasi yang tepat.",
-        "impact": "Penyerang dapat menyuntikkan script berbahaya yang dieksekusi di browser korban, mencuri cookie sesi, atau melakukan phishing.",
-        "solution": "Encode semua output HTML. Gunakan Content Security Policy (CSP). Validasi dan sanitasi semua input. Gunakan library seperti DOMPurify untuk sanitasi sisi klien.",
+        "title":     "Perbaiki Kerentanan Cross-Site Scripting (XSS)",
+        "cause":     "Aplikasi merender data dari pengguna tanpa melakukan encoding atau sanitasi yang tepat, memungkinkan skrip berbahaya dieksekusi di browser pengguna lain.",
+        "impact":    "Penyerang dapat mencuri session cookie, melakukan phishing, mengalihkan pengguna ke situs berbahaya, atau mengeksekusi aksi atas nama korban.",
+        "solution":  "Terapkan output encoding pada semua data yang ditampilkan ke HTML. Gunakan Content Security Policy (CSP) yang ketat. Validasi input di sisi server. Gunakan library sanitasi seperti DOMPurify di sisi klien.",
         "owasp_ref": "A03:2021 - Injection",
-        "cwe_ref": "CWE-79",
-        "cvss": 7.4,
+        "cwe_ref":   "CWE-79",
+        "cvss":       7.4,
+        "priority":  "high",
         "checklist": [
-            "Terapkan HTML entity encoding pada output",
-            "Implementasikan Content Security Policy (CSP)",
-            "Gunakan HTTPOnly flag pada cookie sesi",
-            "Validasi input di sisi server",
-            "Gunakan template engine dengan auto-escaping"
-        ]
-    },
-    "Missing Security Headers": {
-        "title": "Tambahkan Security Headers yang Wajib",
-        "cause": "Web server tidak mengkonfigurasi HTTP security headers yang direkomendasikan.",
-        "impact": "Rentan terhadap serangan clickjacking, MIME-type sniffing, dan cross-site scripting.",
-        "solution": "Tambahkan security headers: X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Content-Security-Policy, Strict-Transport-Security, dan Referrer-Policy.",
-        "owasp_ref": "A05:2021 - Security Misconfiguration",
-        "cwe_ref": "CWE-693",
-        "cvss": 5.4,
-        "checklist": [
-            "Tambahkan Strict-Transport-Security: max-age=31536000",
-            "Tambahkan X-Frame-Options: DENY",
-            "Tambahkan X-Content-Type-Options: nosniff",
-            "Konfigurasi Content-Security-Policy",
-            "Tambahkan Referrer-Policy: no-referrer"
+            "Terapkan HTML entity encoding pada semua output yang berasal dari pengguna",
+            "Implementasikan Content Security Policy (CSP) yang ketat",
+            "Gunakan template engine dengan auto-escaping aktif",
+            "Set flag HttpOnly pada semua session cookie",
+            "Gunakan DOMPurify atau library sanitasi serupa di sisi klien",
+            "Validasi dan batasi karakter yang diterima pada setiap input field",
         ]
     },
     "Critical Security Headers Missing": {
-        "title": "Headers Keamanan Kritis Tidak Ditemukan",
-        "cause": "Hampir semua HTTP security headers standar tidak dikonfigurasi pada server.",
-        "impact": "Sangat rentan terhadap berbagai serangan browser-based. Meningkatkan attack surface secara signifikan.",
-        "solution": "Segera konfigurasi semua security headers yang direkomendasikan OWASP. Gunakan tools seperti securityheaders.com untuk verifikasi.",
+        "title":     "Segera Tambahkan Security Headers Kritis",
+        "cause":     "Web server tidak mengkonfigurasi HTTP security headers yang direkomendasikan oleh OWASP, membiarkan browser tanpa panduan keamanan yang jelas.",
+        "impact":    "Rentan terhadap clickjacking, MIME-sniffing, XSS, dan berbagai serangan browser-based. Ini meningkatkan attack surface secara signifikan.",
+        "solution":  "Tambahkan minimal 5 dari 7 security headers wajib: Strict-Transport-Security, Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, dan X-XSS-Protection.",
         "owasp_ref": "A05:2021 - Security Misconfiguration",
-        "cwe_ref": "CWE-693",
-        "cvss": 7.2,
+        "cwe_ref":   "CWE-693",
+        "cvss":       7.2,
+        "priority":  "high",
         "checklist": [
-            "Audit konfigurasi web server (Apache/Nginx)",
-            "Implementasikan semua OWASP recommended headers",
-            "Uji menggunakan https://securityheaders.com",
-            "Aktifkan HTTPS dan HSTS",
-            "Review konfigurasi setiap deployment"
+            "Tambahkan: Strict-Transport-Security: max-age=31536000; includeSubDomains",
+            "Tambahkan: X-Frame-Options: DENY",
+            "Tambahkan: X-Content-Type-Options: nosniff",
+            "Tambahkan: Referrer-Policy: strict-origin-when-cross-origin",
+            "Tambahkan: Permissions-Policy: geolocation=(), microphone=()",
+            "Konfigurasi Content-Security-Policy yang sesuai dengan kebutuhan aplikasi",
+            "Verifikasi dengan tool: https://securityheaders.com",
+            "Terapkan pada seluruh respons, termasuk error page",
+        ]
+    },
+    "Missing Security Headers": {
+        "title":     "Tambahkan Security Headers yang Direkomendasikan",
+        "cause":     "Beberapa HTTP security headers yang direkomendasikan belum dikonfigurasi pada web server.",
+        "impact":    "Beberapa vektor serangan browser-based yang seharusnya bisa dicegah dengan header tidak terproteksi.",
+        "solution":  "Tambahkan security headers yang belum ada. Untuk Nginx tambahkan di blok server{}, untuk Apache tambahkan di .htaccess atau httpd.conf.",
+        "owasp_ref": "A05:2021 - Security Misconfiguration",
+        "cwe_ref":   "CWE-693",
+        "cvss":       5.4,
+        "priority":  "medium",
+        "checklist": [
+            "Audit header yang ada dengan https://securityheaders.com",
+            "Tambahkan X-Frame-Options: DENY atau SAMEORIGIN",
+            "Tambahkan X-Content-Type-Options: nosniff",
+            "Tambahkan Referrer-Policy: no-referrer-when-downgrade",
+            "Aktifkan HTTPS dan tambahkan HSTS header",
+            "Review dan update konfigurasi web server secara berkala",
         ]
     },
     "Insecure Cookie Configuration": {
-        "title": "Amankan Konfigurasi Cookie Sesi",
-        "cause": "Cookie sesi tidak memiliki flag keamanan yang diperlukan (HttpOnly, Secure, SameSite).",
-        "impact": "Cookie dapat dicuri melalui JavaScript (tanpa HttpOnly) atau dikirim melalui HTTP biasa (tanpa Secure), memungkinkan session hijacking.",
-        "solution": "Set atribut HttpOnly, Secure, dan SameSite=Strict pada semua session cookie.",
+        "title":     "Amankan Konfigurasi Cookie Sesi",
+        "cause":     "Cookie sesi tidak memiliki atribut keamanan yang diperlukan (HttpOnly, Secure, atau SameSite), membuat cookie rentan terhadap pencurian.",
+        "impact":    "Cookie dapat diakses melalui JavaScript (tanpa HttpOnly), dikirim melalui HTTP tidak terenkripsi (tanpa Secure), atau dieksploitasi melalui CSRF (tanpa SameSite).",
+        "solution":  "Pastikan semua cookie sesi memiliki atribut HttpOnly, Secure, dan SameSite=Strict atau Lax. Regenerasi session ID setelah login.",
         "owasp_ref": "A07:2021 - Identification and Authentication Failures",
-        "cwe_ref": "CWE-1004",
-        "cvss": 6.5,
+        "cwe_ref":   "CWE-1004",
+        "cvss":       6.5,
+        "priority":  "medium",
         "checklist": [
-            "Tambahkan HttpOnly flag pada session cookie",
-            "Tambahkan Secure flag pada semua cookie",
-            "Set SameSite=Strict atau SameSite=Lax",
-            "Gunakan cookie dengan masa berlaku yang wajar",
-            "Regenerate session ID setelah login"
+            "Set atribut HttpOnly pada semua session cookie",
+            "Set atribut Secure agar cookie hanya dikirim via HTTPS",
+            "Set SameSite=Strict atau SameSite=Lax untuk mencegah CSRF",
+            "Regenerate session ID setelah login berhasil",
+            "Set masa kadaluarsa cookie yang wajar (bukan session-only untuk semua)",
+            "Hapus cookie yang tidak diperlukan",
+        ]
+    },
+    "Missing SameSite Cookie Flag": {
+        "title":     "Tambahkan Atribut SameSite pada Cookie",
+        "cause":     "Cookie tidak memiliki atribut SameSite, membuat aplikasi berpotensi rentan terhadap serangan CSRF.",
+        "impact":    "Penyerang dari situs lain dapat memicu aksi atas nama pengguna yang sedang login.",
+        "solution":  "Tambahkan SameSite=Strict untuk cookie sesi sensitif, atau SameSite=Lax sebagai minimum.",
+        "owasp_ref": "A07:2021 - Identification and Authentication Failures",
+        "cwe_ref":   "CWE-1275",
+        "cvss":       4.3,
+        "priority":  "low",
+        "checklist": [
+            "Tambahkan SameSite=Strict pada cookie sesi utama",
+            "Gunakan SameSite=Lax jika cross-site navigation diperlukan",
+            "Terapkan CSRF token sebagai lapisan perlindungan tambahan",
+            "Audit semua cookie yang dikirim aplikasi",
         ]
     },
     "Information Disclosure": {
-        "title": "Cegah Kebocoran Informasi Sistem",
-        "cause": "Aplikasi menampilkan informasi detail sistem, stack trace, atau pesan error yang sensitif.",
-        "impact": "Penyerang mendapatkan informasi tentang infrastruktur yang dapat digunakan untuk serangan lebih lanjut.",
-        "solution": "Pastikan aplikasi produksi tidak menampilkan informasi debug atau pesan kesalahan detail. Gunakan error handler yang menampilkan halaman kesalahan generik.",
+        "title":     "Cegah Kebocoran Informasi Sistem",
+        "cause":     "Aplikasi menampilkan pesan error detail, stack trace, atau informasi konfigurasi sistem yang seharusnya tidak terlihat publik.",
+        "impact":    "Penyerang mendapat informasi berharga tentang teknologi, versi, dan struktur internal aplikasi untuk merencanakan serangan lebih lanjut.",
+        "solution":  "Nonaktifkan debug mode di production. Konfigurasi custom error page. Jangan tampilkan stack trace atau pesan error detail kepada pengguna akhir.",
         "owasp_ref": "A05:2021 - Security Misconfiguration",
-        "cwe_ref": "CWE-200",
-        "cvss": 5.3,
+        "cwe_ref":   "CWE-200",
+        "cvss":       5.3,
+        "priority":  "medium",
         "checklist": [
-            "Nonaktifkan mode debug atau detailed error output di lingkungan produksi",
-            "Gunakan halaman error generik untuk kesalahan 404 dan 500",
-            "Jangan tampilkan versi framework atau detail server secara publik",
-            "Hapus komentar debug dan informasi sensitif dari kode produksi",
-            "Periksa apakah log aplikasi hanya dapat diakses oleh tim internal"
+            "Set DEBUG=False atau APP_ENV=production",
+            "Buat halaman error kustom untuk 404, 500, dan error lainnya",
+            "Jangan tampilkan stack trace, nama file, atau baris kode ke pengguna",
+            "Hapus komentar debug dan informasi sensitif dari kode",
+            "Pastikan log error hanya bisa diakses tim internal",
+            "Review endpoint yang mungkin mengekspos informasi sistem",
         ]
     },
     "Server Version Disclosure": {
-        "title": "Sembunyikan Versi Server",
-        "cause": "Header Server mengungkapkan versi web server yang digunakan.",
-        "impact": "Penyerang dapat mencari kerentanan spesifik untuk versi server tersebut.",
-        "solution": "Konfigurasi web server untuk menyembunyikan atau mengubah header Server. Di Nginx: server_tokens off; Di Apache: ServerTokens Prod.",
+        "title":     "Sembunyikan Versi Web Server",
+        "cause":     "Header Server mengungkapkan nama dan versi web server secara spesifik (contoh: nginx/1.18.0).",
+        "impact":    "Penyerang dapat mencari dan mengeksploitasi kerentanan yang diketahui untuk versi server tersebut.",
+        "solution":  "Konfigurasi server untuk menyembunyikan versi. Nginx: server_tokens off; Apache: ServerTokens Prod; IIS: removeServerHeader.",
         "owasp_ref": "A05:2021 - Security Misconfiguration",
-        "cwe_ref": "CWE-200",
-        "cvss": 5.3,
+        "cwe_ref":   "CWE-200",
+        "cvss":       5.3,
+        "priority":  "low",
         "checklist": [
-            "Nginx: tambahkan 'server_tokens off;'",
-            "Apache: set 'ServerTokens Prod'",
-            "Hapus atau samarkan X-Powered-By header",
-            "Perbarui server ke versi terbaru",
-            "Pasang WAF untuk filtering header"
-        ]
-    },
-    "Broken Access Control": {
-        "title": "Perbaiki Kontrol Akses",
-        "cause": "Halaman atau resource sensitif dapat diakses tanpa autentikasi yang memadai.",
-        "impact": "Pengguna tidak sah dapat mengakses data atau fungsi yang seharusnya terbatas.",
-        "solution": "Implementasikan autentikasi dan otorisasi yang tepat. Gunakan middleware auth pada semua route sensitif.",
-        "owasp_ref": "A01:2021 - Broken Access Control",
-        "cwe_ref": "CWE-284",
-        "cvss": 9.1,
-        "checklist": [
-            "Tambahkan middleware autentikasi",
-            "Terapkan role-based access control (RBAC)",
-            "Validasi otorisasi di setiap endpoint",
-            "Deny by default - tolak semua kecuali yang diizinkan",
-            "Log akses yang tidak sah"
-        ]
-    },
-    "File Upload Endpoint Detected": {
-        "title": "Amankan Endpoint Upload File",
-        "cause": "Endpoint upload file memerlukan validasi ketat untuk mencegah upload file berbahaya.",
-        "impact": "Upload file berbahaya dapat menyebabkan Remote Code Execution atau penyimpanan konten berbahaya.",
-        "solution": "Validasi tipe file (whitelist), batasi ukuran, simpan di luar web root, scan dengan antivirus, gunakan nama file acak.",
-        "owasp_ref": "A04:2021 - Insecure Design",
-        "cwe_ref": "CWE-434",
-        "cvss": 8.8,
-        "checklist": [
-            "Validasi MIME type di sisi server",
-            "Whitelist ekstensi file yang diizinkan",
-            "Batasi ukuran file upload",
-            "Simpan file di luar document root",
-            "Rename file dengan nama acak"
+            "Nginx: tambahkan 'server_tokens off;' di nginx.conf",
+            "Apache: set 'ServerTokens Prod' dan 'ServerSignature Off'",
+            "IIS: gunakan URLScan atau konfigurasi removeServerHeader",
+            "Hapus atau ubah header X-Powered-By",
+            "Selalu perbarui server ke versi terbaru yang tersedia",
         ]
     },
     "Technology Stack Disclosure": {
-        "title": "Sembunyikan Informasi Teknologi",
-        "cause": "Header X-Powered-By atau meta generator mengungkapkan teknologi yang digunakan.",
-        "impact": "Memudahkan penyerang menemukan kerentanan spesifik framework/CMS yang digunakan.",
-        "solution": "Hapus header X-Powered-By. Sembunyikan informasi versi CMS. Hapus meta generator tag.",
+        "title":     "Sembunyikan Informasi Technology Stack",
+        "cause":     "Header X-Powered-By atau respons lain mengungkapkan teknologi yang digunakan (PHP, ASP.NET, Express, dll).",
+        "impact":    "Informasi ini memudahkan penyerang mencari kerentanan yang diketahui untuk teknologi tersebut.",
+        "solution":  "Hapus atau ubah header X-Powered-By. Di PHP: expose_php = Off. Di Express: app.disable('x-powered-by'). Di Laravel: ubah konfigurasi middleware.",
         "owasp_ref": "A05:2021 - Security Misconfiguration",
-        "cwe_ref": "CWE-200",
-        "cvss": 5.3,
+        "cwe_ref":   "CWE-200",
+        "cvss":       4.3,
+        "priority":  "low",
         "checklist": [
-            "Hapus X-Powered-By header",
-            "Hapus atau ubah meta generator",
-            "Sembunyikan versi CMS",
-            "Nonaktifkan readme/changelog di root",
-            "Gunakan WAF untuk menyaring response headers"
+            "PHP: set 'expose_php = Off' di php.ini",
+            "Express.js: app.disable('x-powered-by') atau gunakan helmet.js",
+            "Laravel: hapus atau modifikasi middleware yang menambahkan header",
+            "ASP.NET: hapus X-Powered-By via web.config",
+            "Pertimbangkan menggunakan WAF untuk menyaring response header",
+        ]
+    },
+    "Broken Access Control": {
+        "title":     "Perbaiki Kontrol Akses pada Halaman Sensitif",
+        "cause":     "Halaman atau endpoint sensitif (admin, dashboard) dapat diakses tanpa autentikasi atau otorisasi yang memadai.",
+        "impact":    "Pengguna tidak sah dapat mengakses data sensitif, mengubah konfigurasi, atau mengambil alih fungsi administratif.",
+        "solution":  "Implementasikan middleware autentikasi dan otorisasi pada semua route sensitif. Terapkan prinsip deny-by-default.",
+        "owasp_ref": "A01:2021 - Broken Access Control",
+        "cwe_ref":   "CWE-284",
+        "cvss":       9.1,
+        "priority":  "critical",
+        "checklist": [
+            "Tambahkan middleware autentikasi pada semua route sensitif",
+            "Terapkan Role-Based Access Control (RBAC)",
+            "Gunakan prinsip deny-by-default: tolak semua kecuali yang eksplisit diizinkan",
+            "Validasi otorisasi di sisi server, bukan hanya sisi klien",
+            "Log semua upaya akses tidak sah",
+            "Uji seluruh endpoint dengan pengguna tanpa hak akses",
+        ]
+    },
+    "File Upload Endpoint Detected": {
+        "title":     "Amankan Endpoint Upload File",
+        "cause":     "Endpoint upload file ditemukan dan memerlukan validasi ketat untuk mencegah upload file berbahaya.",
+        "impact":    "Tanpa validasi yang tepat, penyerang dapat mengupload file executable yang memungkinkan Remote Code Execution (RCE) pada server.",
+        "solution":  "Validasi tipe file dengan whitelist MIME type, batasi ukuran, simpan di luar web root, rename dengan nama acak, dan scan dengan antivirus.",
+        "owasp_ref": "A04:2021 - Insecure Design",
+        "cwe_ref":   "CWE-434",
+        "cvss":       8.8,
+        "priority":  "high",
+        "checklist": [
+            "Validasi MIME type di sisi server (bukan hanya ekstensi)",
+            "Whitelist hanya ekstensi file yang diperlukan (jpg, png, pdf, dll)",
+            "Batasi ukuran file upload sesuai kebutuhan bisnis",
+            "Simpan file upload di luar document root web server",
+            "Rename file dengan nama acak (UUID) — jangan gunakan nama asli",
+            "Scan file upload dengan antivirus sebelum diproses",
+            "Jangan izinkan eksekusi file dari direktori upload",
         ]
     },
     "Insecure Content Security Policy": {
-        "title": "Perkuat Content Security Policy",
-        "cause": "CSP mengizinkan 'unsafe-inline' yang melemahkan proteksi XSS.",
-        "impact": "Inline scripts masih dapat dieksekusi, mengurangi efektivitas CSP sebagai pertahanan XSS.",
-        "solution": "Hapus 'unsafe-inline' dari CSP. Gunakan nonce atau hash untuk script yang diperlukan. Terapkan CSP ketat.",
+        "title":     "Perkuat Konfigurasi Content Security Policy",
+        "cause":     "CSP yang ada mengizinkan 'unsafe-inline', yang secara signifikan mengurangi proteksi terhadap XSS.",
+        "impact":    "Inline scripts dan styles tetap dapat dieksekusi meskipun CSP aktif, membuat CSP kurang efektif melawan XSS.",
+        "solution":  "Hapus 'unsafe-inline' dari CSP. Gunakan nonce atau hash untuk script yang memang diperlukan. Pindahkan inline script ke file eksternal.",
         "owasp_ref": "A05:2021 - Security Misconfiguration",
-        "cwe_ref": "CWE-1021",
-        "cvss": 5.4,
+        "cwe_ref":   "CWE-1021",
+        "cvss":       5.4,
+        "priority":  "medium",
         "checklist": [
-            "Hapus 'unsafe-inline' dari script-src",
-            "Gunakan nonce-based CSP",
-            "Pindahkan inline script ke file eksternal",
-            "Uji CSP dengan CSP Evaluator",
-            "Aktifkan CSP reporting endpoint"
+            "Hapus 'unsafe-inline' dari directive script-src",
+            "Pindahkan semua inline script ke file JavaScript eksternal",
+            "Gunakan nonce-based CSP: script-src 'nonce-{random}'",
+            "Uji CSP dengan https://csp-evaluator.withgoogle.com",
+            "Aktifkan CSP reporting: report-uri /csp-report",
+            "Terapkan CSP secara bertahap dimulai dari Content-Security-Policy-Report-Only",
         ]
     },
 }
@@ -188,36 +234,70 @@ RECOMMENDATION_TEMPLATES = {
 
 class RecommendationAgent:
     def __init__(self, db: AsyncSession, scan_id: int, predictions: List[Dict]):
-        self.db = db
-        self.scan_id = scan_id
+        self.db          = db
+        self.scan_id     = scan_id
         self.predictions = predictions
 
     async def run(self):
-        seen_predictions = set()
-        for pred in self.predictions:
-            pred_name = pred.get("prediction", "")
-            if pred_name in seen_predictions:
-                continue
-            seen_predictions.add(pred_name)
+        seen: set = set()
 
-            template = RECOMMENDATION_TEMPLATES.get(pred_name)
-            if not template:
+        # Sort by severity so critical comes first
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+        sorted_preds = sorted(
+            self.predictions,
+            key=lambda p: severity_order.get(p.get("severity", "info"), 5)
+        )
+
+        for pred in sorted_preds:
+            pred_name = pred.get("prediction", "")
+            if not pred_name or pred_name in seen:
                 continue
+            seen.add(pred_name)
+
+            tmpl = TEMPLATES.get(pred_name)
+            if not tmpl:
+                # Generic fallback for unknown findings
+                tmpl = {
+                    "title":     f"Tinjau Temuan: {pred_name}",
+                    "cause":     "Potensi masalah keamanan terdeteksi pada proses audit.",
+                    "impact":    "Dampak tergantung pada konteks dan konfigurasi spesifik aplikasi.",
+                    "solution":  "Tinjau temuan ini secara manual dan konsultasikan dengan tim keamanan.",
+                    "owasp_ref": pred.get("owasp", "A05:2021"),
+                    "cwe_ref":   pred.get("cwe", "CWE-200"),
+                    "cvss":       5.0,
+                    "priority":  pred.get("severity", "medium"),
+                    "checklist": [
+                        "Tinjau temuan ini secara manual",
+                        "Konsultasikan dengan tim keamanan",
+                        "Dokumentasikan langkah mitigasi yang diambil",
+                    ]
+                }
+
+            confidence = pred.get("confidence", 0)
+            affected   = pred.get("url", "")
 
             rec = Recommendation(
-                scan_id=self.scan_id,
-                title=template["title"],
-                summary=f"{pred_name} terdeteksi dengan confidence {pred.get('confidence', 0):.0f}%",
-                cause=template["cause"],
-                impact=template["impact"],
-                solution=template["solution"],
-                priority=pred.get("severity", "medium"),
-                owasp_ref=template["owasp_ref"],
-                cwe_ref=template["cwe_ref"],
-                cvss_score=template.get("cvss"),
-                affected_url=pred.get("url", ""),
-                checklist=template.get("checklist", [])
+                scan_id      = self.scan_id,
+                title        = tmpl["title"],
+                summary      = (
+                    f"{pred_name} terdeteksi dengan confidence {confidence:.0f}%. "
+                    f"Prioritas perbaikan: {tmpl.get('priority','medium').upper()}."
+                ),
+                cause        = tmpl["cause"],
+                impact       = tmpl["impact"],
+                solution     = tmpl["solution"],
+                priority     = tmpl.get("priority", pred.get("severity", "medium")),
+                owasp_ref    = tmpl["owasp_ref"],
+                cwe_ref      = tmpl["cwe_ref"],
+                cvss_score   = tmpl.get("cvss"),
+                affected_url = affected,
+                checklist    = tmpl.get("checklist", []),
             )
             self.db.add(rec)
-        
-        await self.db.flush()
+
+        try:
+            await self.db.flush()
+        except Exception as e:
+            logger.warning(f"[Recommendation] flush error: {e}")
+
+        logger.info(f"[Recommendation] {len(seen)} recommendations for scan {self.scan_id}")

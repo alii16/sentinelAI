@@ -12,7 +12,7 @@
   <script src="../../assets/js/layout.js"></script>
 </head>
 <body class="bg-slate-50 font-sans">
-<div id="app-layout"></div>
+  <div id="app-layout"></div>
 <script>
 authGuard();
 renderLayout("reports");
@@ -47,7 +47,7 @@ async function loadReports() {
           ${r.security_score !== null ? `<span class="font-bold ${scoreColor(r.security_score)}">${r.security_score.toFixed(1)}</span><span class="text-xs text-slate-400 ml-1">(${r.grade})</span>` : "–"}
         </td>
         <td class="px-5 py-4">${r.risk_level ? severityBadge(r.risk_level) : "–"}</td>
-        <td class="px-5 py-4 text-xs text-slate-500">${formatDate(r.generated_at)}</td>
+        <td class="px-5 py-4 text-xs text-slate-500">${formatDate(r.created_at)}</td>
         <td class="px-5 py-4 text-right" onclick="event.stopPropagation()">
           <div class="flex items-center justify-end gap-2">
             ${r.has_pdf ? `<a href="${API.reports.pdfUrl(r.id)}" target="_blank" class="p-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition" title="PDF"><i data-lucide="file-text" class="w-3.5 h-3.5"></i></a>` : ""}

@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Scan Baru – Sentinel AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config = { theme: { extend: { fontFamily: { sans: ["Inter","sans-serif"] } } } }</script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>tailwind.config={theme:{extend:{fontFamily:{sans:["Inter","sans-serif"]}}}}</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="../../assets/js/api.js"></script>
@@ -20,42 +20,56 @@ authGuard();
 renderLayout("scan");
 document.getElementById("breadcrumb-title").textContent = "Scan Baru";
 
-let activeScanId = null;
-let ws = null;
-let pollInterval = null;
+let activeScanId  = null;
+let activeWebsiteId = null;
+let pollInterval  = null;
 
 const STAGES = [
-  { key: "discovery",     label: "Discovery",          icon: "search" },
-  { key: "technology",    label: "Technology Detection",icon: "cpu" },
-  { key: "endpoint",      label: "Endpoint Discovery",  icon: "route" },
-  { key: "scanner",       label: "Active Scanner",      icon: "zap" },
-  { key: "verification",  label: "AI Verification",     icon: "brain" },
-  { key: "report",        label: "Generate Report",     icon: "file-text" },
+  { key: "discovery",    label: "Discovery",           icon: "search"      },
+  { key: "technology",   label: "Technology Detection", icon: "cpu"         },
+  { key: "endpoint",     label: "Endpoint Discovery",   icon: "route"       },
+  { key: "scanner",      label: "Active Scanner",       icon: "zap"         },
+  { key: "verification", label: "AI Verification",      icon: "brain"       },
+  { key: "report",       label: "Generate Report",      icon: "file-text"   },
 ];
 
 async function loadContent() {
-  const websitesRes = await API.websites.list();
-  const websites = websitesRes.data?.data?.items || [];
+  const websitesRes = await API.websites.list("?limit=100");
+  const websites    = websitesRes.data?.data?.items || [];
+
+  // Pre-select from URL param ?website_id=X
+  const preselect = new URLSearchParams(window.location.search).get("website_id");
 
   document.getElementById("page-content").innerHTML = `
     <div class="max-w-3xl mx-auto space-y-5">
+
       <!-- Form Card -->
       <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden" id="scan-form-card">
         <div class="px-6 py-4 border-b border-slate-100">
           <h2 class="text-base font-semibold text-slate-900">Mulai Audit Keamanan</h2>
-          <p class="text-xs text-slate-500 mt-0.5">Pilih website dan konfigurasi scan</p>
+          <p class="text-xs text-slate-500 mt-0.5">Pilih website target dan konfigurasi scan</p>
         </div>
         <div class="p-6 space-y-5">
+
           <!-- Website Select -->
           <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">Website Target <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">
+              Website Target <span class="text-red-500">*</span>
+            </label>
             ${websites.length === 0 ? `
               <div class="border border-dashed border-slate-300 rounded-xl p-4 text-center text-slate-400 text-sm">
-                Belum ada website. <a href="../websites/index.html" class="text-slate-900 font-medium underline">Tambah website</a>
+                Belum ada website.
+                <a href="../websites/index.html" class="text-slate-900 font-medium underline">Tambah website</a>
               </div>` : `
-              <select id="website-select" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900">
+              <select id="website-select"
+                class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900
+                       focus:outline-none focus:ring-2 focus:ring-slate-900 transition">
                 <option value="">– Pilih website –</option>
-                ${websites.map(w => `<option value="${w.id}">${w.name} (${w.url})</option>`).join("")}
+                ${websites.map(w =>
+                  `<option value="${w.id}" ${String(w.id) === String(preselect) ? "selected" : ""}>
+                    ${w.name} · ${w.url}
+                  </option>`
+                ).join("")}
               </select>`}
           </div>
 
@@ -63,9 +77,9 @@ async function loadContent() {
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-2">Mode Scan</label>
             <div class="grid grid-cols-3 gap-3">
-              ${modeCard("quick",    "Quick Scan",    "~30 detik",  "Halaman utama & header",       "zap")}
-              ${modeCard("standard","Standard Scan",  "3–10 menit", "Discovery + AI Verification",  "radar")}
-              ${modeCard("full",    "Full Scan",      "10–60 menit","Audit lengkap semua endpoint", "shield", true)}
+              ${modeCard("quick",    "Quick Scan",    "~30 detik",  "Homepage + header check",    "zap")}
+              ${modeCard("standard","Standard Scan",  "3–10 menit", "Discovery + AI Verification", "radar", true)}
+              ${modeCard("full",    "Full Scan",      "10–60 menit","Audit lengkap semua endpoint","shield")}
             </div>
           </div>
 
@@ -74,19 +88,20 @@ async function loadContent() {
             <summary class="text-sm font-medium text-slate-700 cursor-pointer flex items-center gap-2 select-none">
               <i data-lucide="settings-2" class="w-4 h-4"></i>
               Pengaturan Lanjutan
-              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 group-open:rotate-180 transition"></i>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 group-open:rotate-180 transition-transform"></i>
             </summary>
             <div class="mt-4 grid grid-cols-2 gap-4">
-              ${inputField("max-depth",  "Kedalaman Crawling", "number", "5",    "1", "20")}
-              ${inputField("max-pages",  "Maks. Halaman",      "number", "1000", "10","5000")}
-              ${inputField("timeout",    "Timeout (ms)",       "number", "10000","1000","60000")}
+              ${inputField("max-depth", "Kedalaman Crawling", "number", "5",     "1",    "20")}
+              ${inputField("max-pages", "Maks. Halaman",      "number", "1000",  "10",   "5000")}
+              ${inputField("timeout",   "Timeout (ms)",       "number", "10000", "1000", "60000")}
             </div>
           </details>
 
           <!-- Submit -->
           <div class="flex justify-end">
             <button onclick="startScan()" id="start-btn"
-              class="flex items-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50">
+              class="flex items-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm
+                     font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50">
               <i data-lucide="play" class="w-4 h-4"></i>
               <span>Mulai Scan</span>
             </button>
@@ -94,19 +109,20 @@ async function loadContent() {
         </div>
       </div>
 
-      <!-- Progress Card (hidden initially) -->
+      <!-- Progress Card -->
       <div id="progress-card" class="hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h2 class="text-base font-semibold text-slate-900">Audit Sedang Berjalan</h2>
             <p id="progress-site" class="text-xs text-slate-500 mt-0.5"></p>
           </div>
-          <button onclick="cancelScan()" class="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1">
+          <button onclick="cancelScan()"
+            class="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 transition">
             <i data-lucide="x-circle" class="w-3.5 h-3.5"></i> Batalkan
           </button>
         </div>
         <div class="p-6">
-          <!-- Overall Progress -->
+          <!-- Overall -->
           <div class="flex items-center justify-between mb-2">
             <span id="current-agent-label" class="text-sm font-medium text-slate-700">Memulai...</span>
             <span id="overall-pct" class="text-sm font-bold text-slate-900">0%</span>
@@ -115,12 +131,13 @@ async function loadContent() {
             <div id="overall-bar" class="h-full bg-slate-900 rounded-full transition-all duration-500" style="width:0%"></div>
           </div>
 
-          <!-- Stage list -->
+          <!-- Stages -->
           <div class="space-y-3" id="stage-list">
-            ${STAGES.map((s,i) => `
+            ${STAGES.map(s => `
               <div class="flex items-center gap-3" id="stage-${s.key}">
-                <div class="w-8 h-8 rounded-xl flex items-center justify-center border-2 border-slate-200 shrink-0 transition-all" id="stage-icon-${s.key}">
-                  <i data-lucide="${s.icon}" class="w-3.5 h-3.5 text-slate-400" id="stage-lucide-${s.key}"></i>
+                <div id="stage-icon-${s.key}"
+                     class="w-8 h-8 rounded-xl flex items-center justify-center border-2 border-slate-200 shrink-0 transition-all">
+                  <i data-lucide="${s.icon}" class="w-3.5 h-3.5 text-slate-400"></i>
                 </div>
                 <div class="flex-1">
                   <div class="flex items-center justify-between mb-1">
@@ -128,14 +145,14 @@ async function loadContent() {
                     <span class="text-xs text-slate-400" id="stage-pct-${s.key}">–</span>
                   </div>
                   <div class="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                    <div class="h-full bg-slate-400 rounded-full transition-all duration-500" id="stage-bar-${s.key}" style="width:0%"></div>
+                    <div id="stage-bar-${s.key}"
+                         class="h-full bg-slate-400 rounded-full transition-all duration-500" style="width:0%"></div>
                   </div>
                 </div>
-              </div>
-            `).join("")}
+              </div>`).join("")}
           </div>
 
-          <!-- Live Stats -->
+          <!-- Live stats -->
           <div class="mt-5 grid grid-cols-3 gap-3">
             <div class="bg-slate-50 rounded-xl p-3 text-center">
               <p class="text-lg font-bold text-slate-900" id="stat-pages">0</p>
@@ -151,37 +168,38 @@ async function loadContent() {
             </div>
           </div>
 
-          <!-- Logs -->
+          <!-- Log box -->
           <div class="mt-4 bg-slate-900 rounded-xl p-4 max-h-44 overflow-y-auto font-mono" id="log-box">
             <p class="text-xs text-slate-500">[Sentinel AI] Mempersiapkan scan...</p>
           </div>
         </div>
       </div>
 
-      <!-- Result Card (hidden) -->
+      <!-- Result Card (langsung redirect setelah selesai) -->
       <div id="result-card" class="hidden bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
         <div class="text-center py-4">
           <div class="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
             <i data-lucide="check-circle-2" class="w-8 h-8 text-emerald-600"></i>
           </div>
           <p class="text-xl font-bold text-slate-900 mb-1">Audit Selesai!</p>
-          <p class="text-sm text-slate-500 mb-6">Laporan keamanan telah berhasil dibuat</p>
-          <div class="flex items-center justify-center gap-3 mb-6">
+          <p class="text-sm text-slate-500 mb-3">Laporan keamanan berhasil dibuat</p>
+          <div class="flex items-center justify-center gap-4 mb-6">
             <div class="text-center">
               <p id="result-score" class="text-4xl font-bold text-slate-900">–</p>
-              <p class="text-xs text-slate-500">Security Score</p>
+              <p class="text-xs text-slate-500">Score</p>
             </div>
-            <div class="w-px h-12 bg-slate-200"></div>
+            <div class="w-px h-10 bg-slate-200"></div>
             <div class="text-center">
               <p id="result-grade" class="text-4xl font-bold text-slate-900">–</p>
               <p class="text-xs text-slate-500">Grade</p>
             </div>
-            <div class="w-px h-12 bg-slate-200"></div>
+            <div class="w-px h-10 bg-slate-200"></div>
             <div class="text-center">
-              <p id="result-risk" class="text-2xl font-bold text-slate-900">–</p>
-              <p class="text-xs text-slate-500">Risk Level</p>
+              <p id="result-risk" class="text-xl font-bold text-slate-900">–</p>
+              <p class="text-xs text-slate-500">Risk</p>
             </div>
           </div>
+          <p class="text-xs text-slate-400 mb-4">Mengalihkan ke halaman laporan...</p>
           <div class="flex gap-3 justify-center flex-wrap">
             <a id="result-report-link" href="#"
                class="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 transition">
@@ -194,17 +212,17 @@ async function loadContent() {
           </div>
         </div>
       </div>
-    </div>
-  `;
+
+    </div>`;
   lucide.createIcons();
-  updateModeSelection();
 }
 
 function modeCard(value, label, time, desc, icon, selected = false) {
   return `
-    <label class="relative cursor-pointer group mode-card" data-mode="${value}">
-      <input type="radio" name="scan-mode" value="${value}" class="sr-only" ${selected ? "checked" : ""} onchange="updateModeSelection()" />
-      <div class="border-2 ${selected ? "border-slate-900 bg-slate-50" : "border-slate-200"} rounded-xl p-3.5 transition-all group-hover:border-slate-300 mode-card-div">
+    <label class="relative cursor-pointer group">
+      <input type="radio" name="scan-mode" value="${value}" class="sr-only" ${selected ? "checked" : ""}/>
+      <div class="border-2 rounded-xl p-3.5 transition-all group-hover:border-slate-300
+                  ${selected ? "border-slate-900 bg-slate-50" : "border-slate-200"}">
         <i data-lucide="${icon}" class="w-5 h-5 text-slate-600 mb-2"></i>
         <p class="text-sm font-semibold text-slate-900">${label}</p>
         <p class="text-xs text-slate-500 mt-0.5">${time}</p>
@@ -213,76 +231,69 @@ function modeCard(value, label, time, desc, icon, selected = false) {
     </label>`;
 }
 
-function updateModeSelection() {
-  const cards = document.querySelectorAll(".mode-card");
-  cards.forEach(card => {
-    const input = card.querySelector("input[type='radio']");
-    const div = card.querySelector(".mode-card-div");
-    if (input.checked) {
-      div.className = "border-2 border-slate-900 bg-slate-50 rounded-xl p-3.5 transition-all group-hover:border-slate-300 mode-card-div";
-    } else {
-      div.className = "border-2 border-slate-200 rounded-xl p-3.5 transition-all group-hover:border-slate-300 mode-card-div";
-    }
-  });
-}
-
 function inputField(id, label, type, def, min, max) {
   return `
     <div>
       <label class="block text-xs font-medium text-slate-700 mb-1.5">${label}</label>
       <input type="${type}" id="${id}" value="${def}" min="${min}" max="${max}"
-        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm
+               focus:outline-none focus:ring-2 focus:ring-slate-900 transition"/>
     </div>`;
 }
 
 async function startScan() {
   const websiteId = document.getElementById("website-select")?.value;
   if (!websiteId) { toast("Pilih website terlebih dahulu", "warning"); return; }
-  const mode = document.querySelector('input[name="scan-mode"]:checked')?.value || "standard";
-  const maxDepth = parseInt(document.getElementById("max-depth")?.value || 5);
-  const maxPages = parseInt(document.getElementById("max-pages")?.value || 1000);
-  const timeout  = parseInt(document.getElementById("timeout")?.value || 10000);
+
+  const mode      = document.querySelector('input[name="scan-mode"]:checked')?.value || "standard";
+  const maxDepth  = parseInt(document.getElementById("max-depth")?.value  || 5);
+  const maxPages  = parseInt(document.getElementById("max-pages")?.value  || 1000);
+  const timeout   = parseInt(document.getElementById("timeout")?.value    || 10000);
 
   document.getElementById("start-btn").disabled = true;
 
-  const res = await API.scans.create({ website_id: parseInt(websiteId), mode, max_depth: maxDepth, max_pages: maxPages, timeout_ms: timeout });
+  const res = await API.scans.create({
+    website_id: parseInt(websiteId), mode,
+    max_depth: maxDepth, max_pages: maxPages, timeout_ms: timeout
+  });
+
   if (!res.ok) {
     document.getElementById("start-btn").disabled = false;
     toast(res.data.message || "Gagal memulai scan", "error");
     return;
   }
 
-  activeScanId = res.data.data.id;
+  activeScanId    = res.data.data.id;
+  activeWebsiteId = parseInt(websiteId);
+
   document.getElementById("scan-form-card").classList.add("hidden");
   document.getElementById("progress-card").classList.remove("hidden");
 
-  // Get website URL for display
   const wSelect = document.getElementById("website-select");
-  document.getElementById("progress-site").textContent = wSelect?.options[wSelect.selectedIndex]?.text || "";
+  const selText = wSelect?.options[wSelect.selectedIndex]?.text || "";
+  document.getElementById("progress-site").textContent = selText;
 
-  // Start polling (WS fallback)
   startPolling();
 }
 
 function startPolling() {
   pollInterval = setInterval(async () => {
     if (!activeScanId) return;
-    const res = await API.scans.progress(activeScanId);
-    if (!res.ok) return;
-    const d = res.data.data;
-    updateProgress(d);
-
-    // Also load logs
-    const logsRes = await API.scans.logs(activeScanId);
+    const [progRes, logsRes] = await Promise.all([
+      API.scans.progress(activeScanId),
+      API.scans.logs(activeScanId),
+    ]);
+    if (progRes.ok) updateProgress(progRes.data.data);
     if (logsRes.ok) updateLogs(logsRes.data.data || []);
 
-    if (["completed","failed","cancelled"].includes(d.status)) {
+    const status = progRes.data?.data?.status;
+    if (["completed","failed","cancelled"].includes(status)) {
       clearInterval(pollInterval);
-      if (d.status === "completed") {
+      if (status === "completed") {
         const scanRes = await API.scans.get(activeScanId);
         showResult(scanRes.data.data);
       } else {
-        toast("Scan " + (d.status === "failed" ? "gagal" : "dibatalkan"), "error");
+        toast("Scan " + (status === "failed" ? "gagal" : "dibatalkan"), "error");
         resetScan();
       }
     }
@@ -291,23 +302,28 @@ function startPolling() {
 
 function updateProgress(d) {
   const pct = d.progress || 0;
-  document.getElementById("overall-pct").textContent = pct + "%";
-  document.getElementById("overall-bar").style.width = pct + "%";
+  document.getElementById("overall-pct").textContent         = pct + "%";
+  document.getElementById("overall-bar").style.width         = pct + "%";
   document.getElementById("current-agent-label").textContent = d.current_agent || "Memproses...";
-  document.getElementById("stat-pages").textContent = d.pages_found || 0;
-  document.getElementById("stat-endpoints").textContent = d.endpoints_found || 0;
-  document.getElementById("stat-status").textContent = { running:"Berjalan", pending:"Menunggu", completed:"Selesai" }[d.status] || d.status;
+  document.getElementById("stat-pages").textContent          = d.pages_found || 0;
+  document.getElementById("stat-endpoints").textContent      = d.endpoints_found || 0;
+  document.getElementById("stat-status").textContent         =
+    { running:"Berjalan", pending:"Menunggu", completed:"Selesai" }[d.status] || d.status;
 
   const stages = d.stages || {};
   STAGES.forEach(s => {
-    const p = stages[s.key] || 0;
-    document.getElementById(`stage-pct-${s.key}`).textContent = p > 0 ? p + "%" : "–";
-    document.getElementById(`stage-bar-${s.key}`).style.width = p + "%";
-    const iconEl = document.getElementById(`stage-icon-${s.key}`);
-    if (p === 100) {
-      iconEl.className = "w-8 h-8 rounded-xl flex items-center justify-center border-2 border-emerald-500 bg-emerald-50 shrink-0 transition-all";
-    } else if (p > 0) {
-      iconEl.className = "w-8 h-8 rounded-xl flex items-center justify-center border-2 border-blue-500 bg-blue-50 shrink-0 transition-all animate-pulse";
+    const p    = stages[s.key] || 0;
+    const pctEl = document.getElementById(`stage-pct-${s.key}`);
+    const barEl = document.getElementById(`stage-bar-${s.key}`);
+    const icnEl = document.getElementById(`stage-icon-${s.key}`);
+    if (pctEl) pctEl.textContent  = p > 0 ? p + "%" : "–";
+    if (barEl) barEl.style.width  = p + "%";
+    if (icnEl) {
+      if (p >= 100) {
+        icnEl.className = "w-8 h-8 rounded-xl flex items-center justify-center border-2 border-emerald-500 bg-emerald-50 shrink-0 transition-all";
+      } else if (p > 0) {
+        icnEl.className = "w-8 h-8 rounded-xl flex items-center justify-center border-2 border-blue-500 bg-blue-50 shrink-0 transition-all animate-pulse";
+      }
     }
   });
 }
@@ -315,11 +331,11 @@ function updateProgress(d) {
 function updateLogs(logs) {
   const box = document.getElementById("log-box");
   if (!box) return;
+  const colors = { info:"text-green-400", warning:"text-yellow-400", error:"text-red-400", debug:"text-slate-500" };
   box.innerHTML = logs.slice(-20).map(l => {
-    const colors = { info: "text-green-400", warning: "text-yellow-400", error: "text-red-400", debug: "text-slate-400" };
     const c = colors[l.level] || "text-slate-300";
-    const t = new Date(l.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    return `<p class="text-xs ${c}">[${t}] [${l.agent || "System"}] ${l.message}</p>`;
+    const t = formatTime(l.created_at);
+    return `<p class="text-xs ${c}">[${t}] [${l.agent||"System"}] ${l.message}</p>`;
   }).join("");
   box.scrollTop = box.scrollHeight;
 }
@@ -327,14 +343,26 @@ function updateLogs(logs) {
 function showResult(scan) {
   document.getElementById("progress-card").classList.add("hidden");
   document.getElementById("result-card").classList.remove("hidden");
+
   const score = scan.security_score;
-  document.getElementById("result-score").textContent = score ? score.toFixed(1) : "–";
-  document.getElementById("result-score").className = `text-4xl font-bold ${scoreColor(score)}`;
-  document.getElementById("result-grade").textContent = scan.grade || "–";
-  document.getElementById("result-grade").className = `text-4xl font-bold ${gradeColor(scan.grade)}`;
-  document.getElementById("result-risk").textContent = (scan.risk_level || "–").toUpperCase();
-  document.getElementById("result-report-link").href = `../report/detail.html?scan_id=${scan.id}`;
+  const el_score = document.getElementById("result-score");
+  const el_grade = document.getElementById("result-grade");
+  const el_risk  = document.getElementById("result-risk");
+  const el_link  = document.getElementById("result-report-link");
+
+  el_score.textContent  = score ? score.toFixed(1) : "–";
+  el_score.className    = `text-4xl font-bold ${scoreColor(score)}`;
+  el_grade.textContent  = scan.grade || "–";
+  el_grade.className    = `text-4xl font-bold ${gradeColor(scan.grade)}`;
+  el_risk.textContent   = (scan.risk_level || "–").toUpperCase();
+  el_link.href          = `../report/detail.html?scan_id=${scan.id}`;
+
   lucide.createIcons();
+
+  // Auto-redirect setelah 3 detik
+  setTimeout(() => {
+    window.location.href = `../report/detail.html?scan_id=${scan.id}`;
+  }, 3000);
 }
 
 async function cancelScan() {
