@@ -16,66 +16,296 @@
 <script>
 authGuard();
 renderLayout("dataset");
-document.getElementById("breadcrumb-title").textContent = "Dataset";
+document.getElementById("breadcrumb-title").textContent = "Dataset ML";
+
+// ── Dataset info dari hasil training ─────────────────────────────
+const TRAINING_INFO = {
+  "sentinel_dataset_v1.csv": {
+    label: "Dataset Sintetis Bawaan",
+    desc:  "Dataset buatan sistem, digunakan sebagai baseline awal. Akurasi ~65%.",
+    badge: "Sintetis", badgeColor: "bg-slate-100 text-slate-600",
+  },
+  "sentinel_dataset_csic.csv": {
+    label: "HTTP CSIC 2010 (Converted)",
+    desc:  "Dataset dari Canadian Institute for Cybersecurity — HTTP request normal vs attack.",
+    badge: "Nyata", badgeColor: "bg-blue-100 text-blue-700",
+  },
+  "sentinel_dataset_from_scans.csv": {
+    label: "Hasil Scan Sentinel AI",
+    desc:  "Diekspor dari hasil audit aktual yang dilakukan sistem ini. Paling relevan.",
+    badge: "Audit", badgeColor: "bg-emerald-100 text-emerald-700",
+  },
+  "sentinel_final_dataset.csv": {
+    label: "Dataset Final (Merged)",
+    desc:  "Gabungan semua sumber dataset yang telah diseimbangkan. Digunakan untuk training.",
+    badge: "Aktif", badgeColor: "bg-purple-100 text-purple-700",
+  },
+};
 
 async function loadDatasets() {
   const c = document.getElementById("ds-container");
   c.innerHTML = `<div class="p-6">${skeleton(3)}</div>`;
   const res = await API.datasets.list();
   const datasets = res.data?.data || [];
+
   if (!datasets.length) {
-    c.innerHTML = `<div class="py-16 text-center"><i data-lucide="database" class="w-10 h-10 text-slate-300 mx-auto mb-3"></i><p class="text-sm text-slate-500 mb-4">Belum ada dataset yang diunggah</p></div>`;
-    lucide.createIcons(); return;
+    c.innerHTML = `
+      <div class="py-12 text-center">
+        <i data-lucide="database" class="w-10 h-10 text-slate-300 mx-auto mb-3"></i>
+        <p class="text-sm font-medium text-slate-700 mb-1">Belum ada dataset di database</p>
+        <p class="text-xs text-slate-500 max-w-sm mx-auto">
+          Dataset disimpan sebagai file CSV di folder <code class="bg-slate-100 px-1.5 py-0.5 rounded">datasets/processed/</code>.
+          Jalankan script training untuk melihat informasi model yang digunakan.
+        </p>
+      </div>`;
+    lucide.createIcons();
+    return;
   }
-  c.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-sm">
-    <thead class="bg-slate-50 border-b border-slate-100"><tr>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Nama</th>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Versi</th>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Sampel</th>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Status</th>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Tanggal</th>
-    </tr></thead>
-    <tbody class="divide-y divide-slate-50">
-    ${datasets.map(d => `
-      <tr class="hover:bg-slate-50">
-        <td class="px-5 py-4 font-medium text-slate-900">${d.name}</td>
-        <td class="px-5 py-4 text-slate-500 text-xs">v${d.version}</td>
-        <td class="px-5 py-4 text-slate-500">${d.sample_count ? d.sample_count.toLocaleString() : "–"}</td>
-        <td class="px-5 py-4"><span class="px-2 py-0.5 rounded-full text-xs font-semibold ${d.status==='ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${d.status}</span></td>
-        <td class="px-5 py-4 text-xs text-slate-500">${formatDate(d.created_at)}</td>
-      </tr>`).join("")}
-    </tbody></table></div>`;
+
+  c.innerHTML = `
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-100">
+          <tr>
+            <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Nama</th>
+            <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Versi</th>
+            <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Sampel</th>
+            <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Ukuran</th>
+            <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Status</th>
+            <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Diunggah</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-50">
+          ${datasets.map(d => `
+            <tr class="hover:bg-slate-50 transition">
+              <td class="px-5 py-3.5 font-medium text-slate-900">${d.name}</td>
+              <td class="px-5 py-3.5 text-slate-500 text-xs">v${d.version}</td>
+              <td class="px-5 py-3.5 text-slate-600">
+                ${d.sample_count ? d.sample_count.toLocaleString("id-ID") + " record" : "–"}
+              </td>
+              <td class="px-5 py-3.5 text-slate-500 text-xs">
+                ${d.file_size ? formatBytes(d.file_size) : "–"}
+              </td>
+              <td class="px-5 py-3.5">
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+                  ${d.status === 'ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                  ${d.status}
+                </span>
+              </td>
+              <td class="px-5 py-3.5 text-xs text-slate-500">${formatDate(d.created_at)}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
   lucide.createIcons();
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return "–";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
 document.getElementById("page-content").innerHTML = `
   <div class="space-y-5">
-    <div class="flex items-center justify-between">
-      <div><h1 class="text-xl font-bold text-slate-900">Dataset</h1><p class="text-sm text-slate-500">Dataset untuk pelatihan model Machine Learning</p></div>
+
+    <div>
+      <h1 class="text-xl font-bold text-slate-900">Dataset Machine Learning</h1>
+      <p class="text-sm text-slate-500">Dataset yang digunakan untuk melatih model klasifikasi kerentanan</p>
     </div>
-    
-    <!-- Info Card -->
-    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-5">
-      <div class="flex items-start gap-3">
-        <i data-lucide="info" class="w-5 h-5 text-blue-600 shrink-0 mt-0.5"></i>
-        <div>
-          <p class="text-sm font-semibold text-blue-900">Tentang Dataset Sentinel AI</p>
-          <p class="text-sm text-blue-700 mt-1">Dataset berisi hasil audit keamanan website yang telah diverifikasi. Setiap record mewakili satu endpoint yang dianalisis dengan label: Authentication, Authorization, Configuration, Input Validation, Session, Header, Information, Safe.</p>
-          <p class="text-sm text-blue-700 mt-2">Model saat ini dilatih menggunakan dataset internal dengan akurasi rata-rata <strong>93.5%</strong>.</p>
-        </div>
+
+    <!-- ── Penjelasan lengkap ─────────────────────────────────── -->
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
+      <h2 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+        <i data-lucide="info" class="w-4 h-4 text-blue-500"></i>
+        Dataset untuk apa?
+      </h2>
+      <p class="text-sm text-slate-600 leading-relaxed">
+        Sentinel AI menggunakan model <strong>Machine Learning</strong> untuk mengklasifikasikan
+        hasil scan menjadi kategori kerentanan (SQL Injection, XSS, Missing Headers, dll.)
+        dan memberikan <strong>confidence score</strong>.
+        Model dilatih menggunakan dataset berisi contoh HTTP request/response yang sudah diberi label.
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        ${infoCard("brain","Model ML","4 model tersedia: Random Forest, XGBoost, Decision Tree, SVM. Model terbaik dipilih otomatis berdasarkan F1 Score.","text-purple-600","bg-purple-50")}
+        ${infoCard("database","Dataset","Dataset berisi fitur HTTP: status code, response time, header count, cookie flags, dll. Label: 8 kategori kerentanan.","text-blue-600","bg-blue-50")}
+        ${infoCard("trending-up","Akurasi","Akurasi model meningkat seiring bertambahnya data nyata dari hasil scan. Data sintetis: ~65%. Data nyata: ~85%+.","text-emerald-600","bg-emerald-50")}
       </div>
     </div>
 
+    <!-- ── Alur kerja dataset ─────────────────────────────────── -->
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+      <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+        <i data-lucide="workflow" class="w-4 h-4 text-slate-500"></i>
+        Cara Kerja Dataset
+      </h2>
+      <div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+        ${flowStep("1","Download Dataset","Kaggle / HTTP CSIC 2010","search","bg-blue-100 text-blue-700")}
+        <i data-lucide="arrow-right" class="w-4 h-4 text-slate-300 shrink-0 self-center rotate-90 sm:rotate-0"></i>
+        ${flowStep("2","Konversi Format","convert_csic.py","file-code","bg-amber-100 text-amber-700")}
+        <i data-lucide="arrow-right" class="w-4 h-4 text-slate-300 shrink-0 self-center rotate-90 sm:rotate-0"></i>
+        ${flowStep("3","Gabungkan","merge_datasets.py","git-merge","bg-purple-100 text-purple-700")}
+        <i data-lucide="arrow-right" class="w-4 h-4 text-slate-300 shrink-0 self-center rotate-90 sm:rotate-0"></i>
+        ${flowStep("4","Training","train.py","brain","bg-emerald-100 text-emerald-700")}
+        <i data-lucide="arrow-right" class="w-4 h-4 text-slate-300 shrink-0 self-center rotate-90 sm:rotate-0"></i>
+        ${flowStep("5","Digunakan Saat Scan","Verification Agent","shield-check","bg-slate-100 text-slate-700")}
+      </div>
+    </div>
+
+    <!-- ── Sumber dataset ─────────────────────────────────────── -->
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+      <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+        <i data-lucide="layers" class="w-4 h-4 text-slate-500"></i>
+        Sumber Dataset yang Didukung
+      </h2>
+      <div class="space-y-3">
+        ${datasetSource(
+          "HTTP CSIC 2010",
+          "Dataset HTTP request normal vs attack dari Canadian Institute for Cybersecurity. Paling cocok untuk proyek ini.",
+          "https://www.kaggle.com/datasets/crawford/http-csic-2010",
+          "Kaggle · Gratis",
+          "~10 MB",
+          "bg-blue-50 border-blue-200",
+          "text-blue-700"
+        )}
+        ${datasetSource(
+          "UNSW-NB15",
+          "Dataset traffic jaringan dengan 9 kategori serangan. Perlu konversi kolom terlebih dahulu.",
+          "https://www.kaggle.com/datasets/mrwellsdavid/unsw-nb15",
+          "Kaggle · Gratis",
+          "~100 MB",
+          "bg-purple-50 border-purple-200",
+          "text-purple-700"
+        )}
+        ${datasetSource(
+          "NSL-KDD",
+          "Dataset klasik untuk intrusion detection. Mudah digunakan, sudah terstruktur dengan baik.",
+          "https://www.kaggle.com/datasets/hassan06/nslkdd",
+          "Kaggle · Gratis",
+          "~5 MB",
+          "bg-amber-50 border-amber-200",
+          "text-amber-700"
+        )}
+        ${datasetSource(
+          "Hasil Scan Sentinel AI",
+          "Dataset paling relevan — diekspor langsung dari hasil audit yang dilakukan sistem ini. Jalankan export_scan_dataset.py setelah melakukan beberapa scan.",
+          "",
+          "Internal · Otomatis",
+          "Bervariasi",
+          "bg-emerald-50 border-emerald-200",
+          "text-emerald-700"
+        )}
+      </div>
+    </div>
+
+    <!-- ── Perintah terminal ──────────────────────────────────── -->
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+      <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+        <i data-lucide="terminal" class="w-4 h-4 text-slate-500"></i>
+        Perintah Training (jalankan di terminal)
+      </h2>
+      <div class="space-y-3">
+        ${codeBlock("1. Masuk ke folder backend",   "cd sentinel_ai/backend")}
+        ${codeBlock("2. Konversi dataset CSIC",       "python app/ml/training/convert_csic.py")}
+        ${codeBlock("3. Gabungkan semua dataset",     "python app/ml/training/merge_datasets.py")}
+        ${codeBlock("4. Training ulang model",        "python app/ml/training/train.py")}
+        ${codeBlock("5. Export hasil scan sebagai dataset", "python app/ml/training/export_scan_dataset.py")}
+      </div>
+      <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+        <p class="text-xs text-amber-800 flex items-start gap-2">
+          <i data-lucide="lightbulb" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
+          <span>Untuk hasil terbaik: lakukan beberapa scan pada website nyata, kemudian jalankan langkah 5 dan 3 dan 4 secara berurutan agar model belajar dari data audit nyata.</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- ── Tabel dataset di database ─────────────────────────── -->
     <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
       <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-        <p class="text-sm font-semibold text-slate-900">Dataset Tersedia</p>
-        <button onclick="loadDatasets()" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+        <p class="text-sm font-semibold text-slate-900">Dataset Terdaftar di Database</p>
+        <button onclick="loadDatasets()"
+          class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
       </div>
       <div id="ds-container"></div>
     </div>
+
   </div>`;
 lucide.createIcons();
 loadDatasets();
+
+// ── Helper renderers ─────────────────────────────────────────────
+function infoCard(icon, title, desc, textColor, bgColor) {
+  return `
+    <div class="${bgColor} border border-slate-200 rounded-xl p-4">
+      <div class="flex items-center gap-2 mb-2">
+        <i data-lucide="${icon}" class="w-4 h-4 ${textColor}"></i>
+        <p class="text-sm font-semibold text-slate-900">${title}</p>
+      </div>
+      <p class="text-xs text-slate-600 leading-relaxed">${desc}</p>
+    </div>`;
+}
+
+function flowStep(num, title, sub, icon, badgeClass) {
+  return `
+    <div class="flex-1 flex flex-col items-center text-center p-3 bg-slate-50 rounded-xl min-w-0">
+      <div class="w-8 h-8 rounded-xl flex items-center justify-center ${badgeClass} mb-2 shrink-0">
+        <i data-lucide="${icon}" class="w-4 h-4"></i>
+      </div>
+      <p class="text-xs font-semibold text-slate-900 leading-tight">${title}</p>
+      <p class="text-xs text-slate-400 mt-0.5 truncate w-full">${sub}</p>
+    </div>`;
+}
+
+function datasetSource(name, desc, link, meta, size, bgBorder, textColor) {
+  return `
+    <div class="flex items-start gap-3 border ${bgBorder} rounded-xl p-4">
+      <div class="w-8 h-8 rounded-xl ${bgBorder} flex items-center justify-center shrink-0">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4 ${textColor}"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-2 mb-1">
+          <p class="text-sm font-semibold text-slate-900">${name}</p>
+          <span class="text-xs px-2 py-0.5 rounded-full ${bgBorder} ${textColor} font-medium">${meta}</span>
+          <span class="text-xs text-slate-400">${size}</span>
+        </div>
+        <p class="text-xs text-slate-600 leading-relaxed">${desc}</p>
+        ${link ? `
+          <a href="${link}" target="_blank"
+             class="inline-flex items-center gap-1 text-xs ${textColor} hover:underline mt-1.5 font-medium">
+            Download di Kaggle <i data-lucide="external-link" class="w-3 h-3"></i>
+          </a>` : ""}
+      </div>
+    </div>`;
+}
+
+function codeBlock(label, code) {
+  return `
+    <div>
+      <p class="text-xs text-slate-500 mb-1">${label}</p>
+      <div class="bg-slate-900 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3">
+        <code class="text-green-400 text-xs font-mono">${code}</code>
+        <button onclick="copyCode(this, '${code}')"
+          class="shrink-0 text-slate-400 hover:text-white transition">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>`;
+}
+
+function copyCode(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i>';
+    lucide.createIcons();
+    setTimeout(() => {
+      btn.innerHTML = '<i data-lucide="copy" class="w-3.5 h-3.5"></i>';
+      lucide.createIcons();
+    }, 2000);
+  });
+}
 </script>
 </body>
 </html>

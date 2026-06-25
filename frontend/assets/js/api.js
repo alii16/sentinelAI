@@ -6,6 +6,11 @@
 const API_BASE = "http://localhost:8000/api/v1";
 const WS_BASE  = "ws://localhost:8000";
 
+// ── Timezone: WIT (UTC+9) ────────────────────────────────────────
+// Semua timestamp dari backend disimpan sebagai UTC.
+// Konversi ke WIT (Waktu Indonesia Timur, UTC+9) untuk tampilan.
+const USER_TIMEZONE = "Asia/Jayapura"; // WIT UTC+9
+
 // ── Token Management ─────────────────────────────────────────────
 const Auth = {
   getToken: () => localStorage.getItem("sentinel_token"),
@@ -28,6 +33,12 @@ async function request(method, path, body = null, options = {}) {
 
   try {
     const res = await fetch(`${API_BASE}${path}`, config);
+    // File download — return blob
+    if (options.blob) {
+      if (!res.ok) return { ok: false, status: res.status, data: { message: "Gagal mengunduh file" } };
+      const blob = await res.blob();
+      return { ok: true, status: res.status, data: blob };
+    }
     const data = await res.json();
     if (res.status === 401) {
       Auth.clear();
@@ -42,41 +53,12 @@ async function request(method, path, body = null, options = {}) {
   }
 }
 
-async function requestBlob(method, path, body = null, options = {}) {
-  const token = Auth.getToken();
-  const headers = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  Object.assign(headers, options.headers || {});
-
-  const config = { method, headers };
-  if (body) config.body = JSON.stringify(body);
-
-  try {
-    const res = await fetch(`${API_BASE}${path}`, config);
-    if (res.status === 401) {
-      Auth.clear();
-      if (!window.location.pathname.includes("login")) {
-        window.location.href = "/pages/auth/login.html";
-      }
-    }
-    if (!res.ok) {
-      const data = await res.json().catch(() => null);
-      return { ok: false, status: res.status, data };
-    }
-    const blob = await res.blob();
-    return { ok: true, status: res.status, data: blob, contentType: res.headers.get("content-type") };
-  } catch (err) {
-    console.error("API Error:", err);
-    return { ok: false, status: 0, data: { success: false, message: "Gagal terhubung ke server" } };
-  }
-}
-
 const api = {
-  get:    (path) => request("GET", path),
-  post:   (path, body) => request("POST", path, body),
-  put:    (path, body) => request("PUT", path, body),
-  delete: (path) => request("DELETE", path),
-  download: (path) => requestBlob("GET", path),
+  get:    (path, opts)       => request("GET",    path, null, opts || {}),
+  post:   (path, body)       => request("POST",   path, body),
+  put:    (path, body)       => request("PUT",    path, body),
+  delete: (path)             => request("DELETE", path),
+  blob:   (path)             => request("GET",    path, null, { blob: true }),
 };
 
 // ── API Methods ──────────────────────────────────────────────────
@@ -111,12 +93,9 @@ const API = {
   },
   // Reports
   reports: {
-    list:     ()                   => api.get("/reports"),
-    get:      (id)                 => api.get(`/reports/${id}`),
-    download: (id, type)           => api.download(`/reports/${id}/${type}`),
-    pdfUrl:   (id)                 => `${API_BASE}/reports/${id}/pdf`,
-    jsonUrl:  (id)                 => `${API_BASE}/reports/${id}/json`,
-    csvUrl:   (id)                 => `${API_BASE}/reports/${id}/csv`,
+    list:     ()          => api.get("/reports"),
+    get:      (id)        => api.get(`/reports/${id}`),
+    download: (id, type)  => api.blob(`/reports/${id}/${type}`),
   },
   // AI
   ai: {
@@ -129,17 +108,17 @@ const API = {
   },
   // Dashboard
   dashboard: {
-    statistics: ()  => api.get("/dashboard/statistics"),
-    chartScore: ()  => api.get("/dashboard/chart/security-score"),
+    statistics:    () => api.get("/dashboard/statistics"),
+    chartScore:    () => api.get("/dashboard/chart/security-score"),
     chartSeverity: () => api.get("/dashboard/chart/severity"),
     chartActivity: () => api.get("/dashboard/chart/activity"),
   },
   // Notifications
   notifications: {
-    list:      ()   => api.get("/notifications"),
-    markRead:  (id) => api.put(`/notifications/read/${id}`),
-    markAll:   ()   => api.put("/notifications/read-all"),
-    delete:    (id) => api.delete(`/notifications/${id}`),
+    list:     ()   => api.get("/notifications"),
+    markRead: (id) => api.put(`/notifications/read/${id}`),
+    markAll:  ()   => api.put("/notifications/read-all"),
+    delete:   (id) => api.delete(`/notifications/${id}`),
   },
   // Datasets
   datasets: {
@@ -149,7 +128,6 @@ const API = {
 
 // ── WebSocket Helper ─────────────────────────────────────────────
 function connectScanWS(scanId, handlers = {}) {
-  const token = Auth.getToken();
   const ws = new WebSocket(`${WS_BASE}/ws/scan/${scanId}`);
   ws.onopen    = () => handlers.onOpen?.();
   ws.onmessage = (e) => { try { handlers.onMessage?.(JSON.parse(e.data)); } catch {} };
@@ -163,7 +141,7 @@ function toast(message, type = "success") {
   Swal.fire({
     toast: true, position: "top-end",
     icon: type, title: message,
-    showConfirmButton: false, timer: 3000, timerProgressBar: true,
+    showConfirmButton: false, timer: 3500, timerProgressBar: true,
   });
 }
 
@@ -192,8 +170,9 @@ function severityBadge(severity) {
 }
 
 function gradeColor(grade) {
-  const map = { A: "text-emerald-600", B: "text-green-600", C: "text-yellow-600", D: "text-orange-600", E: "text-red-600" };
-  return map[grade] || "text-slate-600";
+  const g = (grade || "").replace("+","");
+  const map = { "A+": "text-emerald-500", A: "text-emerald-600", B: "text-green-600", C: "text-yellow-600", D: "text-orange-600", E: "text-red-600" };
+  return map[grade] || map[g] || "text-slate-600";
 }
 
 function scoreColor(score) {
@@ -204,15 +183,46 @@ function scoreColor(score) {
   return "text-red-600";
 }
 
+/**
+ * Format ISO timestamp ke zona waktu lokal browser pengguna.
+ * Backend menyimpan UTC, browser akan otomatis konversi ke zona waktu OS.
+ * Jika OS kamu sudah diset WIT (UTC+9), hasilnya sudah WIT.
+ */
 function formatDate(iso) {
   if (!iso) return "-";
-  return new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  // Tambahkan "Z" jika tidak ada timezone info supaya dianggap UTC
+  const isoFixed = iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z";
+  return new Date(isoFixed).toLocaleString("id-ID", {
+    timeZone: USER_TIMEZONE,
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function formatDateShort(iso) {
+  if (!iso) return "-";
+  const isoFixed = iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z";
+  return new Date(isoFixed).toLocaleString("id-ID", {
+    timeZone: USER_TIMEZONE,
+    day: "2-digit", month: "short", year: "numeric",
+  });
+}
+
+function formatTime(iso) {
+  if (!iso) return "-";
+  const isoFixed = iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z";
+  return new Date(isoFixed).toLocaleString("id-ID", {
+    timeZone: USER_TIMEZONE,
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
 }
 
 function formatDuration(seconds) {
-  if (!seconds) return "-";
+  if (!seconds && seconds !== 0) return "-";
   if (seconds < 60) return `${seconds} detik`;
-  return `${Math.floor(seconds / 60)} menit ${seconds % 60} detik`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m} menit ${s} detik` : `${m} menit`;
 }
 
 function statusBadge(status) {
@@ -224,12 +234,11 @@ function statusBadge(status) {
     cancelled: "bg-slate-100 text-slate-500",
     paused:    "bg-yellow-100 text-yellow-700",
   };
-  const cls = map[status] || "bg-slate-100 text-slate-600";
   const labels = {
     pending: "Menunggu", running: "Berjalan", completed: "Selesai",
     failed: "Gagal", cancelled: "Dibatalkan", paused: "Dijeda"
   };
-  return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold ${cls}">${labels[status] || status}</span>`;
+  return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold ${map[status] || map.pending}">${labels[status] || status}</span>`;
 }
 
 // Skeleton loader
@@ -237,6 +246,22 @@ function skeleton(lines = 3) {
   return Array(lines).fill(0).map(() =>
     `<div class="h-4 bg-slate-200 rounded animate-pulse mb-2"></div>`
   ).join("");
+}
+
+// Helper download file
+async function downloadFile(reportId, type) {
+  const res = await API.reports.download(reportId, type);
+  if (!res.ok) {
+    toast(res.data?.message || `Gagal mengunduh ${type.toUpperCase()}`, "error");
+    return;
+  }
+  const ext  = type;
+  const name = `sentinel_report_${reportId}.${ext}`;
+  const url  = URL.createObjectURL(res.data);
+  const a    = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  a.remove(); URL.revokeObjectURL(url);
 }
 
 // Redirect if not logged in
@@ -247,8 +272,4 @@ function requireAuth() {
   }
   return true;
 }
-
-// Guard for pages - run on page load
-function authGuard() {
-  if (!requireAuth()) return;
-}
+function authGuard() { requireAuth(); }

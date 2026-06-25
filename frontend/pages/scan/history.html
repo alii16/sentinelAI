@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Riwayat Scan – Sentinel AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config={theme:{extend:{fontFamily:{sans:["Inter","sans-serif"]}}}}</script>
@@ -18,77 +18,172 @@ authGuard();
 renderLayout("history");
 document.getElementById("breadcrumb-title").textContent = "Riwayat Scan";
 
+// Cache website list agar tidak fetch berulang
+let websiteCache = {};
+
+async function loadWebsiteCache() {
+  const res = await API.websites.list("?limit=100");
+  const items = res.data?.data?.items || [];
+  items.forEach(w => { websiteCache[w.id] = w; });
+}
+
 async function loadHistory() {
   const c = document.getElementById("history-container");
   c.innerHTML = `<div class="p-6">${skeleton(6)}</div>`;
+
+  await loadWebsiteCache();
+
   const res = await API.scans.history();
-  if (!res.ok) { c.innerHTML = `<div class="p-8 text-center text-sm text-slate-400">Gagal memuat data</div>`; return; }
-  const scans = res.data.data || [];
-  if (!scans.length) {
-    c.innerHTML = `<div class="py-16 text-center"><i data-lucide="history" class="w-10 h-10 text-slate-300 mx-auto mb-3"></i><p class="text-sm text-slate-500">Belum ada riwayat scan</p><a href="../scan/index.html" class="mt-4 inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-semibold"><i data-lucide="radar" class="w-4 h-4"></i>Mulai Scan</a></div>`;
-    lucide.createIcons(); return;
+  if (!res.ok) {
+    c.innerHTML = `<div class="p-8 text-center text-sm text-slate-400">Gagal memuat data</div>`;
+    return;
   }
-  c.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-sm">
-    <thead class="bg-slate-50 border-b border-slate-100"><tr>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Scan</th>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Mode</th>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Score</th>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Temuan</th>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Durasi</th>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Status</th>
-      <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase">Tanggal</th>
-      <th class="px-5 py-3.5"></th>
-    </tr></thead>
-    <tbody class="divide-y divide-slate-50">
-    ${scans.map(s => `
-      <tr class="hover:bg-slate-50 transition">
-        <td class="px-5 py-4 font-semibold text-slate-900">#${s.id}</td>
-        <td class="px-5 py-4 text-xs text-slate-500 uppercase">${s.mode}</td>
-        <td class="px-5 py-4">
-          ${s.security_score !== null ? `<span class="font-bold ${scoreColor(s.security_score)}">${s.security_score.toFixed(1)}</span><span class="text-xs text-slate-400 ml-1">(${s.grade})</span>` : "–"}
-        </td>
-        <td class="px-5 py-4">
-          <div class="flex items-center gap-1.5 text-xs">
-            <span class="text-red-600 font-semibold">${s.critical_count}</span>
-            <span class="text-orange-500">${s.high_count}</span>
-            <span class="text-yellow-600">${s.medium_count}</span>
-            <span class="text-green-600">${s.low_count}</span>
-          </div>
-        </td>
-        <td class="px-5 py-4 text-xs text-slate-500">${formatDuration(s.duration_seconds)}</td>
-        <td class="px-5 py-4">${statusBadge(s.status)}</td>
-        <td class="px-5 py-4 text-xs text-slate-500">${formatDate(s.created_at)}</td>
-        <td class="px-5 py-4">
-          <div class="flex items-center gap-1.5">
-            ${s.status === "completed" ? `<a href="../report/detail.html?scan_id=${s.id}" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition"><i data-lucide="file-text" class="w-4 h-4"></i></a>` : ""}
-            ${s.status === "completed" ? `<a href="../ai-chat/index.html?scan_id=${s.id}" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-purple-600 transition"><i data-lucide="bot" class="w-4 h-4"></i></a>` : ""}
-            <button onclick="deleteScan(${s.id})" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-          </div>
-        </td>
-      </tr>`).join("")}
-    </tbody></table></div>`;
+  const scans = res.data.data || [];
+
+  if (!scans.length) {
+    c.innerHTML = `
+      <div class="py-16 text-center">
+        <i data-lucide="history" class="w-10 h-10 text-slate-300 mx-auto mb-3"></i>
+        <p class="text-sm text-slate-500 mb-4">Belum ada riwayat scan</p>
+        <a href="../scan/index.html" class="inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-800 transition">
+          <i data-lucide="radar" class="w-4 h-4"></i> Mulai Scan
+        </a>
+      </div>`;
+    lucide.createIcons();
+    return;
+  }
+
+  c.innerHTML = `
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-100">
+          <tr>
+            <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Website</th>
+            <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Score</th>
+            <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Temuan</th>
+            <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Tanggal Scan</th>
+            <th class="px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-50">
+          ${scans.map(s => {
+            const website = websiteCache[s.website_id];
+            const siteName   = website?.name  || `Website #${s.website_id}`;
+            const siteUrl    = website?.url   || "";
+            const siteDomain = website?.domain || (siteUrl ? new URL(siteUrl).hostname : "");
+            return `
+              <tr class="hover:bg-slate-50 transition group">
+                <!-- Website -->
+                <td class="px-5 py-4">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
+                      <i data-lucide="globe" class="w-3.5 h-3.5 text-slate-500"></i>
+                    </div>
+                    <div class="min-w-0">
+                      <p class="font-semibold text-slate-900 truncate max-w-[160px]">${siteName}</p>
+                      <p class="text-xs text-slate-400 truncate max-w-[160px]">${siteDomain || siteUrl || "–"}</p>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Score -->
+                <td class="px-5 py-4">
+                  ${s.security_score !== null ? `
+                    <p class="font-bold text-lg ${scoreColor(s.security_score)}">${s.security_score.toFixed(1)}</p>
+                    <p class="text-xs text-slate-400">${s.grade || "–"} · ${s.mode?.toUpperCase() || ""}</p>
+                  ` : `<span class="text-slate-400">–</span>`}
+                </td>
+
+                <!-- Temuan -->
+                <td class="px-5 py-4">
+                  <div class="flex items-center gap-2 text-xs font-semibold">
+                    ${s.critical_count > 0 ? `<span class="text-red-600">${s.critical_count}C</span>` : ""}
+                    ${s.high_count     > 0 ? `<span class="text-orange-500">${s.high_count}H</span>` : ""}
+                    ${s.medium_count   > 0 ? `<span class="text-yellow-600">${s.medium_count}M</span>` : ""}
+                    ${s.low_count      > 0 ? `<span class="text-green-600">${s.low_count}L</span>` : ""}
+                    ${(s.critical_count + s.high_count + s.medium_count + s.low_count) === 0
+                      ? `<span class="text-slate-400">–</span>` : ""}
+                  </div>
+                  <p class="text-xs text-slate-400 mt-0.5">${s.total_findings || 0} total</p>
+                </td>
+
+                <!-- Status -->
+                <td class="px-5 py-4">${statusBadge(s.status)}</td>
+
+                <!-- Tanggal -->
+                <td class="px-5 py-4">
+                  <p class="text-xs text-slate-700">${formatDate(s.created_at)}</p>
+                  <p class="text-xs text-slate-400 mt-0.5">${formatDuration(s.duration_seconds)}</p>
+                </td>
+
+                <!-- Aksi -->
+                <td class="px-5 py-4">
+                  <div class="flex items-center justify-end gap-1.5">
+                    ${s.status === "completed" ? `
+                      <a href="../report/detail.html?scan_id=${s.id}"
+                         title="Lihat Laporan"
+                         class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition">
+                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                      </a>
+                      <a href="../ai-chat/index.html?scan_id=${s.id}"
+                         title="Tanya AI"
+                         class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-purple-600 transition">
+                        <i data-lucide="bot" class="w-4 h-4"></i>
+                      </a>
+                    ` : ""}
+                    ${s.status === "running" ? `
+                      <a href="../scan/index.html"
+                         title="Lihat Progress"
+                         class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition">
+                        <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+                      </a>
+                    ` : ""}
+                    <button onclick="deleteScan(${s.id})"
+                            title="Hapus"
+                            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-600 transition">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>`;
   lucide.createIcons();
 }
 
 async function deleteScan(id) {
-  const r = await confirm("Hapus scan?", "Data scan dan laporan akan dihapus.");
+  const r = await confirm("Hapus scan?", "Data scan dan laporan akan dihapus permanen.");
   if (r.isConfirmed) {
     const res = await API.scans.delete(id);
     if (res.ok || res.status === 204) { toast("Scan dihapus"); loadHistory(); }
-    else toast("Gagal menghapus", "error");
+    else toast(res.data?.message || "Gagal menghapus", "error");
   }
 }
 
 document.getElementById("page-content").innerHTML = `
   <div class="space-y-5">
     <div class="flex items-center justify-between">
-      <div><h1 class="text-xl font-bold text-slate-900">Riwayat Scan</h1><p class="text-sm text-slate-500">Semua aktivitas audit keamanan website Anda</p></div>
-      <a href="../scan/index.html" class="flex items-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 transition"><i data-lucide="plus" class="w-4 h-4"></i>Scan Baru</a>
+      <div>
+        <h1 class="text-xl font-bold text-slate-900">Riwayat Scan</h1>
+        <p class="text-sm text-slate-500">Semua aktivitas audit keamanan website Anda</p>
+      </div>
+      <a href="../scan/index.html"
+         class="flex items-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 transition">
+        <i data-lucide="plus" class="w-4 h-4"></i> Scan Baru
+      </a>
     </div>
+
     <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
       <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
         <p class="text-sm font-semibold text-slate-900">Semua Scan</p>
-        <button onclick="loadHistory()" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+        <button onclick="loadHistory()"
+                class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
       </div>
       <div id="history-container"></div>
     </div>

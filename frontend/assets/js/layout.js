@@ -105,7 +105,7 @@ function renderLayout(activePage = "") {
 
           <!-- Profile -->
           <div class="w-7 h-7 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-bold cursor-pointer"
-               onclick="window.location.href='/pages/settings/index.html'">
+               onclick="window.location.href='/frontend/pages/settings/index.html'">
             ${name.charAt(0).toUpperCase()}
           </div>
         </div>
