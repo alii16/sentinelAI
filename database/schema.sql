@@ -522,10 +522,11 @@ INSERT INTO roles (name, description) VALUES
     ('analyst', 'Analis keamanan'),
     ('user',    'Pengguna umum');
 
--- Default Admin User (password: Admin@123)
--- Hash: $2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewYpfQN.wqmGZgGy
+-- Default Users (passwords are hashed using bcrypt)
 INSERT INTO users (role_id, name, email, password) VALUES
-    (1, 'Administrator', 'admin@sentinel.ai', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewYpfQN.wqmGZgGy');
+    (1, 'Administrator', 'admin@gmail.com', '$2b$12$BWTx6lGHBZ6Giw6./Ulyq.nJesUJKES0Gg539Ok8/XhoMOlG3MTma'),
+    (2, 'Jane Doe', 'analis@gmail.com', '$2b$12$qHRrwNdFknpG7tReNQ9njuE6QFG8ETfpsEMOKnIQurkFvRhKkYDki'),
+    (3, 'John Doe', 'user@gmail.com', '$2b$12$0cxOF7RoUslIZezNl.RoKO35/ehUwhHT.ACWc/fqZViTL7J2JBG9q');
 
 -- Default Settings
 INSERT INTO settings (key_name, value, type, group_name, description) VALUES

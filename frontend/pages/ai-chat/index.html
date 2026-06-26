@@ -21,6 +21,33 @@
     .prose-sm p { margin-bottom: 0.5rem; }
     .prose-sm ul { list-style: disc; padding-left: 1.2rem; margin-bottom: 0.5rem; }
     .prose-sm code { background:#f1f5f9; padding:1px 4px; border-radius:4px; font-size:0.75rem; font-family:'JetBrains Mono',monospace; }
+
+    
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent; 
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+      transition: background 0.2s ease;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    @supports (scrollbar-width: thin) {
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+      }
+    }
   </style>
 </head>
 <body class="bg-slate-50 font-sans">
