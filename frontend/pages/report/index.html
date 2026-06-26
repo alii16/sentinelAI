@@ -10,6 +10,33 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="../../assets/js/api.js"></script>
   <script src="../../assets/js/layout.js"></script>
+  <style>
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent; 
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+      transition: background 0.2s ease;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    @supports (scrollbar-width: thin) {
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+      }
+    }
+  </style>
 </head>
 <body class="bg-slate-50 font-sans">
   <div id="app-layout"></div>
@@ -50,9 +77,9 @@ async function loadReports() {
         <td class="px-5 py-4 text-xs text-slate-500">${formatDate(r.created_at)}</td>
         <td class="px-5 py-4 text-right" onclick="event.stopPropagation()">
           <div class="flex items-center justify-end gap-2">
-            ${r.has_pdf ? `<a href="${API.reports.pdfUrl(r.id)}" target="_blank" class="p-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition" title="PDF"><i data-lucide="file-text" class="w-3.5 h-3.5"></i></a>` : ""}
-            ${r.has_json ? `<a href="${API.reports.jsonUrl(r.id)}" target="_blank" class="p-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100 transition" title="JSON"><i data-lucide="code-2" class="w-3.5 h-3.5"></i></a>` : ""}
-            ${r.has_csv ? `<a href="${API.reports.csvUrl(r.id)}" target="_blank" class="p-1.5 rounded-lg bg-green-50 border border-green-200 text-green-600 hover:bg-green-100 transition" title="CSV"><i data-lucide="table" class="w-3.5 h-3.5"></i></a>` : ""}
+            ${r.has_pdf ? `<button type="button" onclick="event.stopPropagation(); downloadFile(${r.id}, 'pdf')" class="p-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition" title="PDF"><i data-lucide="file-text" class="w-3.5 h-3.5"></i></button>` : ""}
+            ${r.has_json ? `<button type="button" onclick="event.stopPropagation(); downloadFile(${r.id}, 'json')" class="p-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100 transition" title="JSON"><i data-lucide="code-2" class="w-3.5 h-3.5"></i></button>` : ""}
+            ${r.has_csv ? `<button type="button" onclick="event.stopPropagation(); downloadFile(${r.id}, 'csv')" class="p-1.5 rounded-lg bg-green-50 border border-green-200 text-green-600 hover:bg-green-100 transition" title="CSV"><i data-lucide="table" class="w-3.5 h-3.5"></i></button>` : ""}
           </div>
         </td>
       </tr>`).join("")}

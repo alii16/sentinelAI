@@ -43,7 +43,7 @@ async function request(method, path, body = null, options = {}) {
     if (res.status === 401) {
       Auth.clear();
       if (!window.location.pathname.includes("login")) {
-        window.location.href = "/pages/auth/login.html";
+        window.location.href = "/frontend/pages/auth/login.html";
       }
     }
     return { ok: res.ok, status: res.status, data };
@@ -86,6 +86,7 @@ const API = {
     list:     ()     => api.get("/scans"),
     history:  ()     => api.get("/scans/history"),
     get:      (id)   => api.get(`/scans/${id}`),
+    website:  (id)   => api.get(`/scans/${id}/website`),
     progress: (id)   => api.get(`/scans/${id}/progress`),
     logs:     (id)   => api.get(`/scans/${id}/logs`),
     cancel:   (id)   => api.post(`/scans/${id}/cancel`),
@@ -93,9 +94,15 @@ const API = {
   },
   // Reports
   reports: {
-    list:     ()          => api.get("/reports"),
-    get:      (id)        => api.get(`/reports/${id}`),
-    download: (id, type)  => api.blob(`/reports/${id}/${type}`),
+    list:         ()         => api.get("/reports"),
+    get:          (id)       => api.get(`/reports/${id}`),
+    byScan:       (scanId)   => api.get(`/reports/by-scan/${scanId}`),
+    technologies: (scanId)   => api.get(`/reports/technologies/${scanId}`),
+    download:     (id, type) => api.blob(`/reports/${id}/${type}`),
+    // URL helpers for direct links (used by frontend templates)
+    pdfUrl:       (id)       => `${API_BASE}/reports/${id}/pdf`,
+    jsonUrl:      (id)       => `${API_BASE}/reports/${id}/json`,
+    csvUrl:       (id)       => `${API_BASE}/reports/${id}/csv`,
   },
   // AI
   ai: {
@@ -249,25 +256,20 @@ function skeleton(lines = 3) {
 }
 
 // Helper download file
-async function downloadFile(reportId, type) {
-  const res = await API.reports.download(reportId, type);
-  if (!res.ok) {
-    toast(res.data?.message || `Gagal mengunduh ${type.toUpperCase()}`, "error");
-    return;
-  }
-  const ext  = type;
-  const name = `sentinel_report_${reportId}.${ext}`;
-  const url  = URL.createObjectURL(res.data);
-  const a    = document.createElement("a");
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click();
-  a.remove(); URL.revokeObjectURL(url);
+function downloadFile(reportId, type) {
+  const token = Auth.getToken();
+  const url = `${API_BASE}/reports/${reportId}/${type}?token=${token}`;
+  // Browser buka URL, server kirim file dengan nama asli dari disk
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.click();
 }
 
 // Redirect if not logged in
 function requireAuth() {
   if (!Auth.isLoggedIn()) {
-    window.location.href = "/pages/auth/login.html";
+    window.location.href = "/frontend/pages/auth/login.html";
     return false;
   }
   return true;

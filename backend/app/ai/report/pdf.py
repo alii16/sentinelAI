@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.models.models import (
     Scan, Website, Technology, AIPrediction,
-    Recommendation, Report, ScanLog, Page
+    Recommendation, Report, Page
 )
 from app.core.config import settings
 
@@ -21,13 +21,7 @@ class ReportAgent:
         self.db = db
         self.scan_id = scan_id
 
-    async def run(
-        self,
-        discovery_result: dict | None = None,
-        endpoint_result: dict | None = None,
-        scan_results: list | None = None,
-        predictions: list | None = None,
-    ):
+    async def run(self):
         scan = (await self.db.execute(
             select(Scan).where(Scan.id == self.scan_id)
         )).scalar_one_or_none()
@@ -50,94 +44,39 @@ class ReportAgent:
             select(Recommendation).where(Recommendation.scan_id == self.scan_id)
         )).scalars().all()
 
-        logs = (await self.db.execute(
-            select(ScanLog).where(ScanLog.scan_id == self.scan_id).order_by(ScanLog.created_at)
-        )).scalars().all()
-
-        discovery_result = discovery_result or {}
-        endpoint_result = endpoint_result or {}
-        scan_results = scan_results or []
-        predictions = predictions or []
-
         os.makedirs(settings.REPORT_PATH, exist_ok=True)
         ts = int(datetime.now(timezone.utc).timestamp())
         base = f"scan_{self.scan_id}_{ts}"
 
         exec_summary = self._build_summary(scan, website, preds, recs)
-        discovery_summary = self._build_discovery_summary(discovery_result)
-        endpoint_summary = self._build_endpoint_summary(endpoint_result)
-        timeline = self._build_timeline(logs)
 
         # JSON report
         json_path = os.path.join(settings.REPORT_PATH, f"{base}.json")
         json_data = {
             "scan_id": scan.id,
-            "website": {
-                "name": website.name if website else None,
-                "url": website.url if website else None,
-                "domain": website.domain if website else None,
-                "category": website.category if website else None,
-            },
+            "website": website.url if website else "",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "security_score": float(scan.security_score or 0),
             "grade": scan.grade,
             "risk_level": scan.risk_level,
             "executive_summary": exec_summary,
-            "discovery": discovery_summary,
-            "endpoint_summary": endpoint_summary,
-            "technologies": [{"name": t.name, "category": t.category, "confidence": t.confidence} for t in techs],
-            "findings": [
-                {
-                    "prediction": p.prediction,
-                    "severity": p.severity,
-                    "confidence": float(p.confidence),
-                    "owasp": p.owasp_category,
-                    "cwe": p.cwe_id,
-                    "evidence": p.evidence,
-                    "probability": p.probability,
-                }
-                for p in preds
-            ],
-            "recommendations": [
-                {
-                    "title": r.title,
-                    "summary": r.summary,
-                    "cause": r.cause,
-                    "impact": r.impact,
-                    "solution": r.solution,
-                    "priority": r.priority,
-                    "owasp_ref": r.owasp_ref,
-                    "cwe_ref": r.cwe_ref,
-                    "cvss": float(r.cvss_score or 0),
-                    "affected_url": r.affected_url,
-                    "checklist": r.checklist,
-                }
-                for r in recs
-            ],
-            "scan_results": scan_results,
-            "timeline": timeline,
-            "summary": {
-                "total_pages": scan.total_pages,
-                "total_endpoints": scan.total_endpoints,
-                "total_findings": scan.total_findings,
+            "findings": {
                 "critical": scan.critical_count,
                 "high": scan.high_count,
                 "medium": scan.medium_count,
                 "low": scan.low_count,
+                "total": scan.total_findings,
             },
+            "technologies": [{"name": t.name, "category": t.category, "confidence": t.confidence} for t in techs],
+            "predictions": [
+                {"prediction": p.prediction, "severity": p.severity, "confidence": float(p.confidence),
+                 "owasp": p.owasp_category, "cwe": p.cwe_id} for p in preds
+            ],
+            "recommendations": [
+                {"title": r.title, "priority": r.priority, "solution": r.solution,
+                 "owasp_ref": r.owasp_ref, "cvss": float(r.cvss_score or 0)} for r in recs
+            ]
         }
-
-        # Add pages and assets from discovery
-        if discovery_result:
-            json_data["discovery"]["pages"] = discovery_result.get("pages", [])
-            json_data["discovery"]["forms"] = discovery_result.get("forms", [])
-            json_data["discovery"]["assets"] = discovery_result.get("assets", [])
-            json_data["discovery"]["javascript_files"] = discovery_result.get("javascript_files", [])
-            json_data["discovery"]["css_files"] = discovery_result.get("css_files", [])
-            json_data["discovery"]["internal_links"] = discovery_result.get("internal_links", [])
-            json_data["discovery"]["external_links"] = discovery_result.get("external_links", [])
-            json_data["discovery"]["api_endpoints"] = discovery_result.get("api_endpoints", [])
-
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(json_data, f, indent=2, ensure_ascii=False)
 
@@ -151,10 +90,7 @@ class ReportAgent:
                                   p.owasp_category, p.cwe_id])
 
         # PDF report
-        pdf_path = await self._generate_pdf(
-            scan, website, techs, preds, recs, exec_summary,
-            discovery_summary, endpoint_summary, timeline, base
-        )
+        pdf_path = await self._generate_pdf(scan, website, techs, preds, recs, exec_summary, base)
 
         # Save report record
         report = Report(
@@ -185,52 +121,7 @@ class ReportAgent:
             f"Total {len(recs)} rekomendasi perbaikan telah disiapkan."
         )
 
-    def _build_discovery_summary(self, discovery_result: dict) -> dict:
-        return {
-            "pages_found": discovery_result.get("pages_found", 0),
-            "forms_found": discovery_result.get("forms_found", 0),
-            "endpoints_found": len(discovery_result.get("endpoints", [])),
-            "assets_found": len(discovery_result.get("assets", [])),
-            "internal_links": discovery_result.get("internal_links", []),
-            "external_links": discovery_result.get("external_links", []),
-            "api_endpoints": discovery_result.get("api_endpoints", []),
-            "javascript_files": discovery_result.get("javascript_files", []),
-            "css_files": discovery_result.get("css_files", []),
-        }
-
-    def _build_endpoint_summary(self, endpoint_result: dict) -> dict:
-        return {
-            "endpoints_found": endpoint_result.get("endpoints_found", 0),
-            "top_endpoints": [
-                {"url": e.get("url"), "method": e.get("method"), "priority": e.get("score")}
-                for e in endpoint_result.get("endpoints", [])[:20]
-            ]
-        }
-
-    def _build_timeline(self, logs: list) -> list:
-        return [
-            {
-                "timestamp": l.created_at.isoformat() if l.created_at else None,
-                "agent": l.agent,
-                "level": l.level,
-                "message": l.message,
-            }
-            for l in logs
-        ]
-
-    async def _generate_pdf(
-        self,
-        scan,
-        website,
-        techs,
-        preds,
-        recs,
-        summary,
-        discovery_summary,
-        endpoint_summary,
-        timeline,
-        base,
-    ) -> str:
+    async def _generate_pdf(self, scan, website, techs, preds, recs, summary, base) -> str:
         pdf_path = os.path.join(settings.REPORT_PATH, f"{base}.pdf")
         try:
             from reportlab.lib.pagesizes import A4
@@ -288,6 +179,7 @@ class ReportAgent:
                 ("ALIGN", (0,0), (-1,-1), "CENTER"),
                 ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
                 ("PADDING", (0,0), (-1,-1), 12),
+                ("ROUNDEDCORNERS", [6]),
             ]))
             story.append(score_table)
             story.append(Spacer(1, 12))
@@ -298,17 +190,26 @@ class ReportAgent:
             story.append(Spacer(1, 8))
 
             # Stats
+            duration_sec = scan.duration_seconds or 0
+            if duration_sec < 60:
+                duration_str = f"{duration_sec} detik"
+            else:
+                m = duration_sec // 60
+                s = duration_sec % 60
+                duration_str = f"{m} menit {s} detik" if s else f"{m} menit"
+
             stats_data = [
                 ["Metrik", "Nilai"],
-                ["Website", website.url if website else "-"],
-                ["Total Halaman", str(scan.total_pages)],
+                ["Website",        website.name if website else "-"],
+                ["URL",            website.url if website else "-"],
+                ["Total Halaman",  str(scan.total_pages)],
                 ["Total Endpoint", str(scan.total_endpoints)],
-                ["Durasi Scan", f"{scan.duration_seconds or 0} detik"],
-                ["Mode Scan", scan.mode.upper()],
-                ["Critical", str(scan.critical_count)],
-                ["High", str(scan.high_count)],
-                ["Medium", str(scan.medium_count)],
-                ["Low", str(scan.low_count)],
+                ["Durasi Scan",    duration_str],
+                ["Mode Scan",      scan.mode.upper() if scan.mode else "-"],
+                ["Critical",       str(scan.critical_count)],
+                ["High",           str(scan.high_count)],
+                ["Medium",         str(scan.medium_count)],
+                ["Low",            str(scan.low_count)],
             ]
             stats_table = Table(stats_data, colWidths=["50%", "50%"])
             stats_table.setStyle(TableStyle([
@@ -341,29 +242,6 @@ class ReportAgent:
                 ]))
                 story.append(tech_table)
                 story.append(Spacer(1, 12))
-
-            # Discovery & Endpoints
-            story.append(Paragraph("Ringkasan Discovery & Endpoint", h2))
-            discovery_rows = [
-                ["Metric", "Nilai"],
-                ["Halaman Ditemukan", str(discovery_summary.get("pages_found", 0))],
-                ["Form Ditemukan", str(discovery_summary.get("forms_found", 0))],
-                ["Endpoint Ditemukan", str(discovery_summary.get("endpoints_found", 0))],
-                ["Aset Ditemukan", str(discovery_summary.get("assets_found", 0))],
-                ["Endpoint API", str(len(discovery_summary.get("api_endpoints", [])))],
-            ]
-            discovery_table = Table(discovery_rows, colWidths=["50%", "50%"])
-            discovery_table.setStyle(TableStyle([
-                ("BACKGROUND", (0,0), (-1,0), BLACK),
-                ("TEXTCOLOR", (0,0), (-1,0), colors.white),
-                ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-                ("FONTSIZE", (0,0), (-1,-1), 9),
-                ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, BG]),
-                ("GRID", (0,0), (-1,-1), 0.5, GRAY),
-                ("PADDING", (0,0), (-1,-1), 6),
-            ]))
-            story.append(discovery_table)
-            story.append(Spacer(1, 12))
 
             # Findings
             if preds:
@@ -404,31 +282,6 @@ class ReportAgent:
                     if r.solution:
                         story.append(Paragraph(f"<b>Solusi:</b> {r.solution}", body))
                     story.append(Spacer(1, 6))
-
-            if endpoint_summary and endpoint_summary.get("top_endpoints"):
-                story.append(Paragraph("Top Endpoint Prioritas", h2))
-                endpoint_rows = [["URL", "Method", "Priority"]]
-                for ep in endpoint_summary.get("top_endpoints", []):
-                    endpoint_rows.append([ep.get("url", "-"), ep.get("method", "-"), str(ep.get("priority", "-"))])
-                endpoint_table = Table(endpoint_rows, colWidths=["55%", "20%", "25%"])
-                endpoint_table.setStyle(TableStyle([
-                    ("BACKGROUND", (0,0), (-1,0), BLACK),
-                    ("TEXTCOLOR", (0,0), (-1,0), colors.white),
-                    ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0,0), (-1,-1), 9),
-                    ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, BG]),
-                    ("GRID", (0,0), (-1,-1), 0.5, GRAY),
-                    ("PADDING", (0,0), (-1,-1), 6),
-                ]))
-                story.append(endpoint_table)
-                story.append(Spacer(1, 12))
-
-            # Timeline
-            if timeline:
-                story.append(Paragraph("Timeline Scan", h2))
-                for item in timeline[-10:]:
-                    story.append(Paragraph(f"{item['timestamp']} - [{item['agent']}] {item['message']}", body))
-                story.append(Spacer(1, 12))
 
             # Footer
             story.append(HRFlowable(width="100%", thickness=1, color=GRAY, spaceBefore=12))

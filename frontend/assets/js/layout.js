@@ -37,8 +37,8 @@ function renderLayout(activePage = "") {
     <aside id="sidebar" class="fixed left-0 top-0 h-full w-60 bg-white border-r border-slate-200 z-40 flex flex-col transition-transform duration-300 lg:translate-x-0 -translate-x-full">
       <!-- Logo -->
       <div class="flex items-center gap-3 px-5 py-5 border-b border-slate-200">
-        <div class="w-8 h-8 bg-slate-900 rounded-xl flex items-center justify-center">
-          <i data-lucide="shield-check" class="w-4 h-4 text-white"></i>
+        <div class="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center">
+          <img src="../../assets/img/logo.png" alt="Sentinel AI Logo" class="w-full h-full object-contain">
         </div>
         <div>
           <p class="text-sm font-bold text-slate-900">Sentinel AI</p>

@@ -1,4 +1,0 @@
-No,Temuan,Severity,Confidence,OWASP,CWE
-1,Missing Security Headers,medium,99%,A05:2021,CWE-693
-2,Critical Security Headers Missing,high,99%,A05:2021,CWE-693
-3,Server Version Disclosure,low,98%,A05:2021,CWE-200

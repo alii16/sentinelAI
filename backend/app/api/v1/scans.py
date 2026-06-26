@@ -169,3 +169,34 @@ async def delete_scan(scan_id: int, current_user=Depends(get_current_user), db: 
     await db.delete(scan)
     await db.commit()
     return ok(None, 204, "Scan dihapus")
+
+
+@router.get("/{scan_id}/website")
+async def get_scan_website(
+    scan_id: int,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get the website associated with a scan."""
+    scan = (await db.execute(
+        select(Scan).where(Scan.id == scan_id, Scan.user_id == current_user.id)
+    )).scalar_one_or_none()
+    if not scan:
+        return fail("Scan tidak ditemukan", 404)
+
+    website = (await db.execute(
+        select(Website).where(Website.id == scan.website_id)
+    )).scalar_one_or_none()
+
+    if not website:
+        return fail("Website tidak ditemukan", 404)
+
+    return ok({
+        "id":          website.id,
+        "name":        website.name,
+        "url":         website.url,
+        "domain":      website.domain,
+        "category":    website.category,
+        "description": website.description,
+        "status":      website.status,
+    })

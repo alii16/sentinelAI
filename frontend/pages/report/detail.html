@@ -12,6 +12,33 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="../../assets/js/api.js"></script>
   <script src="../../assets/js/layout.js"></script>
+  <style>
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent; 
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+      transition: background 0.2s ease;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    @supports (scrollbar-width: thin) {
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+      }
+    }
+  </style>
 </head>
 <body class="bg-slate-50 font-sans">
 <div id="app-layout"></div>
@@ -35,11 +62,14 @@ async function loadReport() {
   const content = document.getElementById("page-content");
   content.innerHTML = `<div class="space-y-4 max-w-5xl mx-auto">${skeleton(8)}</div>`;
 
-  const [scanRes, predsRes, recsRes, techRes] = await Promise.all([
+  // Load all data in parallel using correct endpoints
+  const [scanRes, predsRes, recsRes, websiteRes, techRes, reportRes] = await Promise.all([
     API.scans.get(scanId),
     API.ai.predictions(scanId),
     API.ai.recommendations(scanId),
-    API.ai.summary(scanId),
+    API.scans.website(scanId),
+    API.reports.technologies(scanId),
+    API.reports.byScan(scanId),
   ]);
 
   if (!scanRes.ok) {
@@ -48,20 +78,14 @@ async function loadReport() {
     return;
   }
 
-  const scan  = scanRes.data.data;
-  const preds = predsRes.data?.data  || [];
-  const recs  = recsRes.data?.data   || [];
-  const techs = techRes.data?.data   || [];
-  const score = scan.security_score  || 0;
-  const grade = scan.grade           || "–";
-
-  // Ambil info website
-  const websiteRes = await API.websites.get(scan.website_id);
-  const website    = websiteRes.ok ? websiteRes.data?.data || {} : {};
-
-  // Ambil report untuk download links
-  const repsRes  = await API.reports.list();
-  const report   = (repsRes.data?.data || []).find(r => String(r.scan_id) === String(scanId));
+  const scan    = scanRes.data.data;
+  const preds   = predsRes.data?.data  || [];
+  const recs    = recsRes.data?.data   || [];
+  const website = websiteRes.data?.data || {};
+  const techs   = techRes.data?.data   || [];
+  const report  = reportRes.data?.data || null;
+  const score   = scan.security_score  || 0;
+  const grade   = scan.grade           || "–";
   const reportId = report?.id;
 
   // Kelompokkan teknologi per kategori

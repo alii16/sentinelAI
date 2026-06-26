@@ -1,6 +1,0 @@
-No,Temuan,Severity,Confidence,OWASP,CWE
-1,Missing Security Headers,medium,99%,A05:2021,CWE-693
-2,Insecure Content Security Policy,medium,97%,A05:2021,CWE-1021
-3,Cross-Site Scripting (XSS),high,87%,A03:2021,CWE-79
-4,Cross-Site Scripting (XSS),high,87%,A03:2021,CWE-79
-5,Cross-Site Scripting (XSS),high,87%,A03:2021,CWE-79
